@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>MATH LEGENDS: BATTLE ARENA</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ INTRO / PEMBUKA ============ -->
+  <section class="screen active" id="screen-intro">
+    <div class="intro">
+      <div class="intro-shine" aria-hidden="true"></div>
+      <div class="logo intro-logo">MATH <b>LEGENDS</b></div>
+      <div class="tagline intro-tagline">⚔️ BATTLE ARENA ⚔️</div>
+      <div class="intro-heroes" id="intro-heroes"></div>
+      <button class="btn big primary intro-btn" data-act="intro-start">▶️ MULAI</button>
+      <div class="intro-foot">Jawab soal • Serang lawan • Jadi legenda</div>
+    </div>
+  </section>
+
+  <!-- ============ HOME ============ -->
+  <section class="screen" id="screen-home">
+    <div class="page home">
+      <div class="panel home-head">
+        <button class="ava-btn" data-nav="profile" id="h-ava" title="Profil">⚔️</button>
+        <div class="hh-info">
+          <div class="hh-name" id="h-name">PEMAIN</div>
+          <div class="hh-sub"><span id="h-level">Lv 1</span><span class="dot">•</span><span id="h-rank">🥉 BRONZE</span></div>
+          <div class="bar tiny"><div class="barfill xp" id="h-xpfill"></div></div>
+        </div>
+        <div class="hh-wallet">
+          <span class="wallet-chip" id="h-coins">🪙 0</span>
+          <span class="wallet-chip gem" id="h-diamonds">💎 0</span>
+        </div>
+      </div>
+
+      <div class="home-hero">
+        <div class="logo">MATH <b>LEGENDS</b></div>
+        <div class="tagline">⚔️ BATTLE ARENA ⚔️</div>
+        <div class="mascot" id="h-mascot">⚔️</div>
+      </div>
+
+      <button class="btn big primary" data-nav="setup">⚔️ MAIN SEKARANG</button>
+
+      <div class="home-grid">
+        <button class="tile" data-nav="learn"><b>📚</b><span>LATIHAN</span></button>
+        <button class="tile" data-nav="missions"><b>🎯</b><span>MISI</span></button>
+        <button class="tile" data-nav="achievements"><b>🏆</b><span>PRESTASI</span></button>
+        <button class="tile" data-nav="leaderboard"><b>🏅</b><span>PAPAN SKOR</span></button>
+        <button class="tile" data-nav="profile"><b>👤</b><span>PROFIL</span></button>
+      </div>
+
+      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.6 offline</span></div>
+    </div>
+  </section>
+
+  <!-- ============ SETUP (pilih hero + lawan) ============ -->
+  <section class="screen" id="screen-setup">
+    <div class="page">
+      <div class="page-head">
+        <button class="back" data-nav="home">‹</button>
+        <h2 id="su-title">PILIH HERO</h2>
+        <span class="su-mode" id="su-mode">RANKED</span>
+      </div>
+      <div class="hero-cards" id="su-heroes"></div>
+      <div class="panel hero-detail" id="su-detail"></div>
+      <h3 class="su-label">🤖 PILIH LAWAN AI</h3>
+      <div class="ai-chips" id="su-ai"></div>
+      <div class="su-online" id="su-online" style="display:none">
+        <h3 class="su-label">🌐 LAWAN SUNGGUHAN (ONLINE)</h3>
+        <button class="btn big online" data-act="pvp-search">🌐 CARI LAWAN 1v1</button>
+        <p class="page-desc small">Lawan pemain lain lewat Firebase — hero yang sedang dipilih akan dipakai.</p>
+      </div>
+      <button class="btn big primary" data-act="start-battle" id="su-start">⚔️ MULAI BATTLE</button>
+    </div>
+  </section>
+
+  <!-- ============ BATTLE ============ -->
+  <section class="screen" id="screen-battle">
+    <div class="battle" id="battle-root">
+      <button class="btn-quit" id="b-quit" data-act="quit">🏳️</button>
+
+      <div class="b-top">
+        <div class="fighter me">
+          <div class="f-ava" id="b-p-ava">⚔️</div>
+          <div class="f-body">
+            <div class="f-name" id="b-p-name">RAKA</div>
+            <div class="hpbar"><div class="hpfill p" id="b-p-hpfill"></div><span class="hptext" id="b-p-hptext"></span></div>
+            <div class="f-row">
+              <div class="energy" id="b-p-energy"></div>
+              <span class="shield-tag" id="b-p-shield">🛡️</span>
+              <span class="combo-badge" id="b-p-combo"></span>
+            </div>
+          </div>
+        </div>
+        <div class="vs-box">
+          <div class="round" id="b-round">1/18</div>
+          <div class="vs">VS</div>
+        </div>
+        <div class="fighter foe">
+          <div class="f-ava" id="b-e-ava">🔥</div>
+          <div class="f-body">
+            <div class="f-name" id="b-e-name">BYTE-2</div>
+            <div class="hpbar"><div class="hpfill e" id="b-e-hpfill"></div><span class="hptext" id="b-e-hptext"></span></div>
+            <div class="f-row">
+              <div class="energy foe-e" id="b-e-energy"></div>
+              <span class="shield-tag" id="b-e-shield">🛡️</span>
+              <span class="combo-badge foe" id="b-e-combo"></span>
+            </div>
+            <div class="f-status" id="b-e-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arena" id="b-arena">
+        <div class="hero-fig p" id="b-hero-p">⚔️</div>
+        <div class="fx-layer" id="b-fx"></div>
+        <div class="hero-fig e" id="b-hero-e">🔥</div>
+      </div>
+
+      <div class="skillbar">
+        <button class="skill-btn" id="b-skill" data-act="use-skill"></button>
+        <span class="skill-hint">Jawab benar untuk mengisi ⚡ Energy</span>
+      </div>
+
+      <div class="qpanel">
+        <div class="q-head">
+          <span class="q-topic" id="q-topic">ALJABAR</span>
+          <span class="q-diff" id="q-diff">SULIT</span>
+          <div class="q-timer"><div class="q-timerbar" id="q-timerbar"></div></div>
+          <span class="q-time" id="q-time">10</span>
+        </div>
+        <div class="q-text" id="q-text">…</div>
+        <div class="answers" id="q-answers">
+          <button class="ans" data-act="answer" data-i="0"><b>A</b><span></span></button>
+          <button class="ans" data-act="answer" data-i="1"><b>B</b><span></span></button>
+          <button class="ans" data-act="answer" data-i="2"><b>C</b><span></span></button>
+          <button class="ans" data-act="answer" data-i="3"><b>D</b><span></span></button>
+        </div>
+        <div class="q-feedback" id="q-feedback"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section class="screen" id="screen-result">
+    <div class="page">
+      <div class="res-banner" id="res-banner">VICTORY</div>
+      <div class="res-sub" id="res-sub"></div>
+      <div class="res-grid">
+        <div class="panel res-box" id="res-rewards"></div>
+        <div class="panel res-box" id="res-stats"></div>
+      </div>
+      <div class="panel res-box" id="res-topics"></div>
+      <div class="panel res-box" id="res-reco"></div>
+      <div class="panel res-box" id="res-unlocks"></div>
+      <div class="panel res-box" id="res-wrong"></div>
+      <div class="res-actions">
+        <button class="btn primary" data-act="again">🔁 MAIN LAGI</button>
+        <button class="btn ghost" data-nav="home">🏠 BERANDA</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LEARN / LATIHAN ============ -->
+  <section class="screen" id="screen-learn">
+    <div class="page">
+      <div class="page-head">
+        <button class="back" data-nav="home">‹</button>
+        <h2>📚 LATIHAN MATERI</h2><span></span>
+      </div>
+      <p class="page-desc">Pilih satu materi, lalu kalahkan AI dalam <b>Practice Battle</b> — semua soal fokus ke materi pilihanmu.</p>
+      <div class="topic-grid" id="learn-topics"></div>
+    </div>
+  </section>
+
+  <!-- ============ MISI HARIAN ============ -->
+  <section class="screen" id="screen-missions">
+    <div class="page">
+      <div class="page-head">
+        <button class="back" data-nav="home">‹</button>
+        <h2>🎯 MISI HARIAN</h2><span></span>
+      </div>
+      <div id="missions-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ ACHIEVEMENT ============ -->
+  <section class="screen" id="screen-achievements">
+    <div class="page">
+      <div class="page-head">
+        <button class="back" data-nav="home">‹</button>
+        <h2>🏆 PRESTASI</h2><span></span>
+      </div>
+      <div class="ach-grid" id="ach-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ LEADERBOARD ============ -->
+  <section class="screen" id="screen-leaderboard">
+    <div class="page">
+      <div class="page-head">
+        <button class="back" data-nav="home">‹</button>
+        <h2>🏅 PAPAN SKOR</h2><span></span>
+      </div>
+      <div class="board-tabs" id="board-tabs">
+        <button class="tab active" data-act="board-tab" data-tab="global">🌐 GLOBAL</button>
+        <button class="tab" data-act="board-tab" data-tab="school">🏫 SEKOLAH</button>
+        <button class="tab" data-act="board-tab" data-tab="friends">🤝 TEMAN</button>
+      </div>
+      <div id="board-list"></div>
+      <p class="page-desc small">Mode offline: peringkat dari data lokal. Versi online akan memakai Firebase.</p>
+    </div>
+  </section>
+
+  <!-- ============ PROFIL ============ -->
+  <section class="screen" id="screen-profile">
+    <div class="page">
+      <div class="page-head">
+        <button class="back" data-nav="home">‹</button>
+        <h2>👤 PROFIL</h2><span></span>
+      </div>
+      <div class="panel pf-card">
+        <div class="ava-btn big" id="pf-ava">⚔️</div>
+        <div class="pf-info">
+          <div class="pf-name" id="pf-name">PEMAIN <button class="mini-btn" data-act="edit-name">✏️</button></div>
+          <div class="pf-sub" id="pf-level">Level 1</div>
+          <div class="bar tiny"><div class="barfill xp" id="pf-xpfill"></div></div>
+          <div class="pf-sub2" id="pf-xptext"></div>
+        </div>
+      </div>
+      <div class="panel pf-card">
+        <div class="pf-rank" id="pf-rank">🥉 BRONZE</div>
+        <div class="pf-info">
+          <div class="bar tiny"><div class="barfill rp" id="pf-rpfill"></div></div>
+          <div class="pf-sub2" id="pf-rptext"></div>
+        </div>
+      </div>
+      <div class="panel res-stats" id="pf-stats"></div>
+      <div class="panel res-box" id="pf-topics"></div>
+      <div class="panel pf-settings">
+        <button class="btn ghost wide" id="pf-sound" data-act="toggle-sound">🔊 SUARA: ON</button>
+        <button class="btn danger wide" data-act="reset-progress">🗑️ RESET PROGRES</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="js/core.js"></script>
+<script src="js/data.js"></script>
+<script src="js/rules.js"></script>
+<script src="js/questions.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/player.js"></script>
+    <script src="js/leaderboard.js"></script>
+    <!-- AKTIFKAN FIREBASE (opsional): sisipkan tag script firebase-config.js di sini. Lihat README-FIREBASE.md -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/backend.js"></script>
+    <script src="js/pvp.js"></script>
+    <script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
