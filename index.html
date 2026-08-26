@@ -773,6 +773,9 @@ body {
   border-radius: 14px; padding: 8px 14px 8px 22px; margin: 8px 0;
 }
 
+/* baris status koneksi pada modal PvP */
+.m-status { font-size: 13px; font-weight: 800; color: #4338ca; margin: 6px 0 2px; }
+
 </style>
 </head>
 <body>
@@ -823,7 +826,7 @@ body {
         <button class="tile" data-nav="shop"><b>🛍️</b><span>TOKO</span></button>
       </div>
 
-      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.8.3 offline</span></div>
+      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.8.4 offline</span></div>
       <button class="link-btn" data-act="watch">📺 Mode Wasit (tonton turnamen)</button>
     </div>
   </section>
@@ -1181,7 +1184,7 @@ body {
   const U = ML.util;
 
   ML.DATA = {
-    version: '0.8.3',
+    version: '0.8.4',
 
     /* ---------- HERO (5 hero, identitas original; gambar karakter di folder assets) ---------- */
     heroes: [
@@ -1841,7 +1844,7 @@ body {
     'atk-morru': 'assets/audio/atk-morru.mp3'
   };
 
-  const Audio = (ML.Audio = {
+  const AudioSystem = (ML.Audio = {
     ctx: null,
     enabled: true,        // SFX
     musicEnabled: true,   // musik latar
@@ -1863,33 +1866,57 @@ body {
       return this.ctx;
     },
 
-    /* ---------- probe ketersediaan file (aman, tanpa log error) ---------- */
+    /* ---------- probe ketersediaan file ---------- */
     probeFiles: function () {
       const self = this;
       const all = Object.assign({}, MUSIC_FILES, SFX_FILES);
       Object.keys(all).forEach(function (name) {
         try {
-          const a = new Audio(all[name]);
+          const a = new window.Audio();
           a.preload = 'metadata';
           a.addEventListener('loadedmetadata', function () { self._files[name] = true; });
+          a.addEventListener('canplaythrough', function () { self._files[name] = true; });
           a.addEventListener('error', function () { self._files[name] = false; });
-          self._files[name] = self._files[name] || null; // null = belum diketahui
+          self._files[name] = null;
+          a.src = all[name];
+          try { a.load(); } catch (e) {}
         } catch (e) { self._files[name] = false; }
       });
     },
     fileReady: function (name) { return this._files[name] === true; },
+    filesDetected: function () {
+      const names = Object.keys(this._files);
+      return { ok: names.filter(n => this._files[n] === true).length, total: names.length, names: names.filter(n => this._files[n] === true) };
+    },
 
     _playFile: function (name, vol, loop) {
       const url = (MUSIC_FILES[name] || SFX_FILES[name]);
-      if (!url || !this.fileReady(name)) return false;
+      if (!url || typeof window === 'undefined') return false;
       try {
-        const el = new Audio(url);
+        // Jangan menunggu probeFiles(). Audio harus langsung dicoba saat
+        // dipanggil dari klik/tap user; probe sebelumnya bersifat asynchronous.
+        const el = new window.Audio();
+        el.preload = 'auto';
+        el.src = url;
         el.loop = !!loop;
         el.volume = vol != null ? vol : 0.5;
+        el.addEventListener('canplaythrough', function () {
+          this._files[name] = true;
+        }.bind(this), { once: true });
+        el.addEventListener('error', function () {
+          this._files[name] = false;
+        }.bind(this), { once: true });
         const p = el.play();
-        if (p && p.catch) p.catch(function () {});
+        if (p && p.catch) {
+          p.catch(function () {
+            // Autoplay policy dapat menolak play(); jangan buang element.
+            // Panggilan berikutnya dari gesture user akan mencoba lagi.
+          });
+        }
         return el;
-      } catch (e) { return null; }
+      } catch (e) {
+        return null;
+      }
     },
 
     /* ---------- musik latar ---------- */
@@ -1898,7 +1925,7 @@ body {
       if (this._currentTrack === track && this._musicEl) return;
       this.musicStop();
       this._currentTrack = track;
-      // file milikmu bila ada; bila belum: tetap hening (SFX sintesis tetap hidup)
+      // Coba file secara langsung; jangan menunggu probe asynchronous.
       const el = this._playFile(track, 0.32, true);
       this._musicEl = el || { pause: function () {} }; // stub agar aman bila Audio tak tersedia
       if (!el) this._currentTrack = null;
@@ -3188,101 +3215,136 @@ window.ML_FIREBASE_CONFIG = {
     return c;
   };
 
-  /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung.
-     Kode dibuat PEMANGGIL (main.js) agar bisa ditampilkan SEBELUM menulis ke jaringan. */
-  PVP.createRoom = function (fb, me, code, onFound, onFail) {
+  /* HOST/GUEST ROOM FLOW — v0.10
+     Guest claims the room AND changes status to `playing` in one write.
+     Host only observes. This removes the old host-side write/transaction race. */
+  PVP.createRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
-    let unsub = null, done = false;
-    code = String(code || PVP.makeCode()).toUpperCase();
+    let unsub = null, poll = null, timer = null, done = false;
+    code = String(code || PVP.makeCode()).trim().toUpperCase();
     const roomRef = fs.doc(db, 'rooms', code);
-
-    const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
-    const finish = function (v) { if (done) return; done = true; stop(); if (v) onFound(v); else onFail && onFail('cancel'); };
-
-    fs.setDoc(roomRef, _clean({
-      status: 'waiting', host: uid, hostName: (me.name || 'PEMAIN').slice(0, 12),
-      hostHero: me.hero || 'raka', hostMr: isFinite(me.mr) ? me.mr : 1000, hostGear: me.gear || null,
-      guest: null, guestName: null, guestHero: null, guestMr: null, guestGear: null,
-      createdAt: Date.now(), updatedAt: Date.now()
-    })).then(function () {
-      unsub = fs.onSnapshot(roomRef, function (snap) {
-        if (done || !snap.exists()) return;
-        const d = snap.data();
-        if (d.guest && d.guestUid) {
-          const opp = { uid: d.guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka', mr: d.guestMr || 1000, gear: d.guestGear || null };
-          // ubah ke ruangan pertandingan aktif (format NetBattle)
-          fs.setDoc(roomRef, _clean({
-            status: 'playing', host: uid, guest: opp.uid,
-            names: { host: me.name, guest: opp.name },
-            heroes: { host: me.hero, guest: opp.hero },
-            round: 0, q: null, ans: null, skillReq: false, surrender: false,
-            seq: 0, frame: null, winner: null, result: null,
-            hostAlive: Date.now(), guestAlive: Date.now(), updatedAt: Date.now()
-          })).then(function () {
-            finish({ role: 'host', roomId: code, opp: opp });
-          }).catch(function (e) { if (!done) { done = true; stop(); onFail && onFail(String(e && e.code || e)); } });
-        }
-      }, function (e) { if (!done) { done = true; onFail && onFail(String(e && e.code || e)); } });
-      // kedaluwarsa otomatis bila tak ada lawan dalam 3 menit
-      setTimeout(function () {
-        if (done) return;
-        fs.getDoc(roomRef).then(function (snap) {
-          if (!done && snap.exists() && snap.data().status === 'waiting') {
-            fs.deleteDoc(roomRef).catch(function () {});
-            done = true; stop(); onFail && onFail('timeout');
-          }
-        }).catch(function () {});
-      }, 180000);
-    }).catch(function (e) { if (!done) { done = true; onFail && onFail(String(e && e.code || e)); } });
-
-    return {
-      code: code,
-      cancel: function () {
-        finish(null);
-        try { fs.deleteDoc(roomRef).catch(function () {}); } catch (e) {}
+    const stop = function () {
+      if (unsub) { try { unsub(); } catch(e) {} unsub = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    const fail = function(e) {
+      if (done) return;
+      done = true; stop();
+      const msg = String(e && (e.code || e.message) || e);
+      if (G.console) console.error('[ML PVP HOST]', msg, e);
+      onFail && onFail(msg);
+    };
+    const finish = function(v) {
+      if (done) return;
+      done = true; stop();
+      onFound && onFound(v);
+    };
+    const consume = function(snap) {
+      if (done || !snap || !snap.exists()) return;
+      const d = snap.data() || {};
+      if (G.console) console.log('[ML PVP HOST ROOM]', code, d.status, d.guestUid || d.guest || null);
+      const guestUid = d.guestUid || d.guest;
+      if (!guestUid || guestUid === uid) return;
+      const opp = {
+        uid: guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka',
+        mr: d.guestMr || 1000, gear: d.guestGear || null
+      };
+      if (d.status === 'playing') {
+        if (onState) onState('starting');
+        finish({ role:'host', roomId:code, opp:opp });
       }
     };
+
+    fs.setDoc(roomRef, _clean({
+      status:'waiting', host:uid,
+      hostName:(me.name || 'PEMAIN').slice(0,12), hostHero:me.hero || 'raka',
+      hostMr:isFinite(me.mr) ? me.mr : 1000, hostGear:me.gear || null,
+      guest:null, guestUid:null, guestName:null, guestHero:null, guestMr:null, guestGear:null,
+      createdAt:Date.now(), updatedAt:Date.now()
+    })).then(function(){
+      if (onState) onState('waiting');
+      unsub = fs.onSnapshot(roomRef, consume, fail);
+      poll = setInterval(function(){
+        if (done) return;
+        fs.getDoc(roomRef).then(consume).catch(function(e){
+          if (G.console) console.warn('[ML PVP HOST POLL]', e && (e.code || e.message) || e);
+        });
+      }, 750);
+      timer = setTimeout(function(){
+        if (done) return;
+        fs.getDoc(roomRef).then(function(snap){
+          const d = snap.exists() ? snap.data() : null;
+          if (d && d.status === 'playing' && (d.guestUid || d.guest)) return consume(snap);
+          if (snap.exists()) fs.deleteDoc(roomRef).catch(function(){});
+          fail('timeout');
+        }).catch(fail);
+      }, 180000);
+    }).catch(fail);
+
+    return { code:code, cancel:function(){
+      if (done) return;
+      done = true; stop();
+      fs.deleteDoc(roomRef).catch(function(){});
+      onFail && onFail('cancel');
+    }};
   };
 
-  /* GUEST: gabung dengan kode -> cb({role:'guest', roomId, opp}) saat host memulai */
-  PVP.joinRoom = function (fb, me, code, onFound, onFail) {
+  PVP.joinRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
-    const roomRef = fs.doc(db, 'rooms', String(code || '').trim().toUpperCase());
-    let unsub = null, done = false;
-    const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
+    const cleanCode = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if (!cleanCode) { onFail && onFail('invalid-code'); return {cancel:function(){}}; }
+    const roomRef = fs.doc(db, 'rooms', cleanCode);
+    let unsub = null, poll = null, timer = null, done = false;
+    const stop = function(){
+      if (unsub) { try { unsub(); } catch(e) {} unsub = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    const fail = function(e){
+      if (done) return;
+      done = true; stop();
+      const msg = String(e && (e.code || e.message) || e);
+      if (G.console) console.error('[ML PVP GUEST]', msg, e);
+      onFail && onFail(msg);
+    };
+    const finish = function(v){
+      if (done) return;
+      done = true; stop(); onFound && onFound(v);
+    };
 
-    fs.runTransaction(db, async function (tx) {
-      const snap = await tx.get(roomRef);
+    fs.getDoc(roomRef).then(function(snap){
       if (!snap.exists()) throw new Error('NOT_FOUND');
-      const d = snap.data();
-      if (d.status !== 'waiting' || d.guest) throw new Error('FULL');
-      tx.update(roomRef, _clean({
-        guest: uid, guestUid: uid, guestName: (me.name || 'PEMAIN').slice(0, 12),
-        guestHero: me.hero || 'raka', guestMr: isFinite(me.mr) ? me.mr : 1000,
-        guestGear: me.gear || null, updatedAt: Date.now()
-      }));
-      return { hostName: d.hostName, hostHero: d.hostHero, hostMr: d.hostMr, hostGear: d.hostGear, hostUid: d.host };
-    }).then(function (info) {
-      const opp = { uid: info.hostUid, name: info.hostName || 'HOST', hero: info.hostHero || 'raka', mr: info.hostMr || 1000, gear: info.hostGear || null };
-      unsub = fs.onSnapshot(roomRef, function (snap) {
-        if (done || !snap.exists()) return;
-        const d = snap.data();
-        if (d.status === 'playing' && d.guest === uid) {
-          done = true; stop();
-          onFound({ role: 'guest', roomId: roomRef.id, opp: opp });
-        }
-      }, function (e) { if (!done) { done = true; stop(); onFail && onFail(String(e && e.code || e)); } });
-      // batas tunggu 60 dtk utk host memulai
-      setTimeout(function () {
-        if (!done) { done = true; stop(); onFail && onFail('timeout'); }
-      }, 60000);
-    }).catch(function (e) {
-      const m = String(e && e.message || e);
-      if (done) return; done = true;
-      onFail && onFail(m.indexOf('FULL') >= 0 ? 'full' : m.indexOf('NOT_FOUND') >= 0 ? 'notfound' : m);
-    });
+      const d = snap.data() || {};
+      if (d.status !== 'waiting') throw new Error('FULL');
+      if (d.host === uid) throw new Error('SELF');
+      if (d.guest || d.guestUid) throw new Error('FULL');
+      const opp = { uid:d.host, name:d.hostName || 'HOST', hero:d.hostHero || 'raka', mr:d.hostMr || 1000, gear:d.hostGear || null };
 
-    return { cancel: function () { if (!done) { done = true; stop(); onFail && onFail('cancel'); } } };
+      // CRITICAL: guest itself starts the room. Host is read-only from here.
+      return fs.updateDoc(roomRef, _clean({
+        status:'playing',
+        guest:uid, guestUid:uid,
+        guestName:(me.name || 'PEMAIN').slice(0,12), guestHero:me.hero || 'raka',
+        guestMr:isFinite(me.mr) ? me.mr : 1000, guestGear:me.gear || null,
+        names:{host:d.hostName || 'HOST', guest:(me.name || 'PEMAIN').slice(0,12)},
+        heroes:{host:d.hostHero || 'raka', guest:me.hero || 'raka'},
+        round:0, q:null, ans:null, skillReq:false, surrender:false,
+        seq:0, frame:null, winner:null, result:null,
+        hostAlive:Date.now(), guestAlive:Date.now(), updatedAt:Date.now()
+      })).then(function(){
+        if (onState) onState('starting');
+        // Guest does not wait for host. Both clients now see the same playing document.
+        finish({role:'guest', roomId:roomRef.id, opp:opp});
+      }).catch(function(e){ throw e; });
+    }).catch(function(e){
+      const m = String(e && (e.code || e.message) || e);
+      if (/NOT_FOUND|not-found/i.test(m)) fail('notfound');
+      else if (/FULL/i.test(m)) fail('full');
+      else if (/SELF/i.test(m)) fail('self');
+      else fail(m);
+    });
+    return { cancel:function(){ if (!done) { done=true; stop(); onFail && onFail('cancel'); } } };
   };
 
   /* ================= NET BATTLE ================= */
@@ -3787,6 +3849,12 @@ window.ML_FIREBASE_CONFIG = {
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     },
 
+    /* perbarui baris status pada modal yang terbuka */
+    setModalStatus: function (text) {
+      const st = U.$('.m-status');
+      if (st) st.textContent = text;
+    },
+
     /* modal input generik (kode ruangan / gabung / wasit) */
     inputModal: function (title, desc, placeholder, btnLabel, cb) {
       const self = this;
@@ -3823,6 +3891,7 @@ window.ML_FIREBASE_CONFIG = {
         '<h3 style="margin-top:12px">🎮 Ruangan dibuat!</h3>' +
         '<p>Berikan kode ini kepada lawan:<br>' +
         '<b class="room-code">' + esc(code) + '</b></p>' +
+        '<div class="m-status">⏳ Menunggu lawan bergabung… (jangan tutup layar ini)</div>' +
         '<p class="page-desc small">Lawan: MAIN → 🌐 GABUNG KODE → masuk ' + esc(code) + '.<br>Wasit: 📺 Mode Wasit → kode yang sama.</p>' +
         '<div class="m-actions"><button class="btn ghost" data-mact="cancel">BATAL</button></div>' +
         '</div>'
@@ -3871,6 +3940,7 @@ window.ML_FIREBASE_CONFIG = {
         '<div style="text-align:center">' +
         '<div class="spinner"></div>' +
         '<h3 style="margin-top:12px">🔎 Mencari lawan…</h3>' +
+        '<div class="m-status">Menghubungi server…</div>' +
         '<p>Lawan sungguhan dicari lewat Firebase.<br>Biasanya sekejap bila ada pemain lain mencari.</p>' +
         '<div class="m-actions"><button class="btn ghost" data-mact="cancel">BATAL</button></div>' +
         '</div>'
@@ -3898,7 +3968,7 @@ window.ML_FIREBASE_CONFIG = {
       el('h-mascot').innerHTML = heroImg(P.heroDef());
       el('h-mr').textContent = pf.mr;
       const net = el('h-net');
-      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8.3 🟢 online' : 'v0.8.3 offline';
+      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8.4 🟢 online' : 'v0.8.4 offline';
     },
 
     /* ================= SETUP ================= */
@@ -4091,7 +4161,9 @@ window.ML_FIREBASE_CONFIG = {
       el('pf-topics').innerHTML = '<h3>📈 PENGUASAAN MATERI</h3>' + this.topicBars(pf.perTopic, true);
 
       el('pf-sound').innerHTML = AU.enabled ? '🔊 EFEK SUARA: ON' : '🔇 EFEK SUARA: OFF';
-      el('pf-music').innerHTML = AU.musicEnabled ? '🎵 MUSIK: ON' : '🎵 MUSIK: OFF';
+      const det = AU.filesDetected ? AU.filesDetected() : { ok: 0, total: 0 };
+      el('pf-music').innerHTML = (AU.musicEnabled ? '🎵 MUSIK: ON' : '🎵 MUSIK: OFF') +
+        (det.total ? ' <small>(file terdeteksi ' + det.ok + '/' + det.total + ')</small>' : '');
     },
 
     /* ---------- helper kecil ---------- */
@@ -4740,7 +4812,13 @@ window.ML_FIREBASE_CONFIG = {
             function (err) {
               UI.closeModal();
               UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' :
-                       err === 'cancel' ? 'ℹ️ Dibatalkan' : '⚠️ Buat ruangan: ' + String(err).slice(0, 90));
+                       err === 'cancel' ? 'ℹ️ Dibatalkan' : err === 'permission-denied' ? '🔒 Firebase menolak akses room (Rules).' : '⚠️ Buat ruangan: ' + String(err).slice(0, 90));
+            },
+            function (st) {
+              if (st === 'joining') {
+                AU.play('rankup');
+                UI.setModalStatus('✅ Lawan masuk! Memulai pertandingan…');
+              }
             });
         } catch (e) {
           UI.closeModal();
@@ -4762,7 +4840,14 @@ window.ML_FIREBASE_CONFIG = {
               UI.closeModal();
               UI.toast(err === 'full' ? '⚠️ Ruangan sudah penuh' :
                        err === 'notfound' ? '⚠️ Kode tidak ditemukan' :
-                       err === 'timeout' ? '⌛ Host tidak merespons' : 'ℹ️ Dibatalkan');
+                       err === 'self' ? '⚠️ Tidak bisa bergabung ke room sendiri' :
+                       err === 'timeout' ? '⌛ Host tidak merespons' :
+                       /permission-denied/i.test(String(err)) ? '🔒 Firebase menolak akses ke room. Cek Firestore Rules.' :
+                       '⚠️ Gagal bergabung: ' + String(err).slice(0, 100));
+            },
+            function (st) {
+              if (st === 'claimed') { AU.play('skill'); UI.setModalStatus('✅ Terhubung ke ruangan! Menunggu host memulai…'); }
+              else if (st === 'starting') UI.setModalStatus('⚔️ Memulai pertandingan…');
             });
         });
         break;

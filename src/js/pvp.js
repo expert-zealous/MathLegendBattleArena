@@ -222,101 +222,136 @@
     return c;
   };
 
-  /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung.
-     Kode dibuat PEMANGGIL (main.js) agar bisa ditampilkan SEBELUM menulis ke jaringan. */
-  PVP.createRoom = function (fb, me, code, onFound, onFail) {
+  /* HOST/GUEST ROOM FLOW — v0.10
+     Guest claims the room AND changes status to `playing` in one write.
+     Host only observes. This removes the old host-side write/transaction race. */
+  PVP.createRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
-    let unsub = null, done = false;
-    code = String(code || PVP.makeCode()).toUpperCase();
+    let unsub = null, poll = null, timer = null, done = false;
+    code = String(code || PVP.makeCode()).trim().toUpperCase();
     const roomRef = fs.doc(db, 'rooms', code);
-
-    const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
-    const finish = function (v) { if (done) return; done = true; stop(); if (v) onFound(v); else onFail && onFail('cancel'); };
-
-    fs.setDoc(roomRef, _clean({
-      status: 'waiting', host: uid, hostName: (me.name || 'PEMAIN').slice(0, 12),
-      hostHero: me.hero || 'raka', hostMr: isFinite(me.mr) ? me.mr : 1000, hostGear: me.gear || null,
-      guest: null, guestName: null, guestHero: null, guestMr: null, guestGear: null,
-      createdAt: Date.now(), updatedAt: Date.now()
-    })).then(function () {
-      unsub = fs.onSnapshot(roomRef, function (snap) {
-        if (done || !snap.exists()) return;
-        const d = snap.data();
-        if (d.guest && d.guestUid) {
-          const opp = { uid: d.guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka', mr: d.guestMr || 1000, gear: d.guestGear || null };
-          // ubah ke ruangan pertandingan aktif (format NetBattle)
-          fs.setDoc(roomRef, _clean({
-            status: 'playing', host: uid, guest: opp.uid,
-            names: { host: me.name, guest: opp.name },
-            heroes: { host: me.hero, guest: opp.hero },
-            round: 0, q: null, ans: null, skillReq: false, surrender: false,
-            seq: 0, frame: null, winner: null, result: null,
-            hostAlive: Date.now(), guestAlive: Date.now(), updatedAt: Date.now()
-          })).then(function () {
-            finish({ role: 'host', roomId: code, opp: opp });
-          }).catch(function (e) { if (!done) { done = true; stop(); onFail && onFail(String(e && e.code || e)); } });
-        }
-      }, function (e) { if (!done) { done = true; onFail && onFail(String(e && e.code || e)); } });
-      // kedaluwarsa otomatis bila tak ada lawan dalam 3 menit
-      setTimeout(function () {
-        if (done) return;
-        fs.getDoc(roomRef).then(function (snap) {
-          if (!done && snap.exists() && snap.data().status === 'waiting') {
-            fs.deleteDoc(roomRef).catch(function () {});
-            done = true; stop(); onFail && onFail('timeout');
-          }
-        }).catch(function () {});
-      }, 180000);
-    }).catch(function (e) { if (!done) { done = true; onFail && onFail(String(e && e.code || e)); } });
-
-    return {
-      code: code,
-      cancel: function () {
-        finish(null);
-        try { fs.deleteDoc(roomRef).catch(function () {}); } catch (e) {}
+    const stop = function () {
+      if (unsub) { try { unsub(); } catch(e) {} unsub = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    const fail = function(e) {
+      if (done) return;
+      done = true; stop();
+      const msg = String(e && (e.code || e.message) || e);
+      if (G.console) console.error('[ML PVP HOST]', msg, e);
+      onFail && onFail(msg);
+    };
+    const finish = function(v) {
+      if (done) return;
+      done = true; stop();
+      onFound && onFound(v);
+    };
+    const consume = function(snap) {
+      if (done || !snap || !snap.exists()) return;
+      const d = snap.data() || {};
+      if (G.console) console.log('[ML PVP HOST ROOM]', code, d.status, d.guestUid || d.guest || null);
+      const guestUid = d.guestUid || d.guest;
+      if (!guestUid || guestUid === uid) return;
+      const opp = {
+        uid: guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka',
+        mr: d.guestMr || 1000, gear: d.guestGear || null
+      };
+      if (d.status === 'playing') {
+        if (onState) onState('starting');
+        finish({ role:'host', roomId:code, opp:opp });
       }
     };
+
+    fs.setDoc(roomRef, _clean({
+      status:'waiting', host:uid,
+      hostName:(me.name || 'PEMAIN').slice(0,12), hostHero:me.hero || 'raka',
+      hostMr:isFinite(me.mr) ? me.mr : 1000, hostGear:me.gear || null,
+      guest:null, guestUid:null, guestName:null, guestHero:null, guestMr:null, guestGear:null,
+      createdAt:Date.now(), updatedAt:Date.now()
+    })).then(function(){
+      if (onState) onState('waiting');
+      unsub = fs.onSnapshot(roomRef, consume, fail);
+      poll = setInterval(function(){
+        if (done) return;
+        fs.getDoc(roomRef).then(consume).catch(function(e){
+          if (G.console) console.warn('[ML PVP HOST POLL]', e && (e.code || e.message) || e);
+        });
+      }, 750);
+      timer = setTimeout(function(){
+        if (done) return;
+        fs.getDoc(roomRef).then(function(snap){
+          const d = snap.exists() ? snap.data() : null;
+          if (d && d.status === 'playing' && (d.guestUid || d.guest)) return consume(snap);
+          if (snap.exists()) fs.deleteDoc(roomRef).catch(function(){});
+          fail('timeout');
+        }).catch(fail);
+      }, 180000);
+    }).catch(fail);
+
+    return { code:code, cancel:function(){
+      if (done) return;
+      done = true; stop();
+      fs.deleteDoc(roomRef).catch(function(){});
+      onFail && onFail('cancel');
+    }};
   };
 
-  /* GUEST: gabung dengan kode -> cb({role:'guest', roomId, opp}) saat host memulai */
-  PVP.joinRoom = function (fb, me, code, onFound, onFail) {
+  PVP.joinRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
-    const roomRef = fs.doc(db, 'rooms', String(code || '').trim().toUpperCase());
-    let unsub = null, done = false;
-    const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
+    const cleanCode = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if (!cleanCode) { onFail && onFail('invalid-code'); return {cancel:function(){}}; }
+    const roomRef = fs.doc(db, 'rooms', cleanCode);
+    let unsub = null, poll = null, timer = null, done = false;
+    const stop = function(){
+      if (unsub) { try { unsub(); } catch(e) {} unsub = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    const fail = function(e){
+      if (done) return;
+      done = true; stop();
+      const msg = String(e && (e.code || e.message) || e);
+      if (G.console) console.error('[ML PVP GUEST]', msg, e);
+      onFail && onFail(msg);
+    };
+    const finish = function(v){
+      if (done) return;
+      done = true; stop(); onFound && onFound(v);
+    };
 
-    fs.runTransaction(db, async function (tx) {
-      const snap = await tx.get(roomRef);
+    fs.getDoc(roomRef).then(function(snap){
       if (!snap.exists()) throw new Error('NOT_FOUND');
-      const d = snap.data();
-      if (d.status !== 'waiting' || d.guest) throw new Error('FULL');
-      tx.update(roomRef, _clean({
-        guest: uid, guestUid: uid, guestName: (me.name || 'PEMAIN').slice(0, 12),
-        guestHero: me.hero || 'raka', guestMr: isFinite(me.mr) ? me.mr : 1000,
-        guestGear: me.gear || null, updatedAt: Date.now()
-      }));
-      return { hostName: d.hostName, hostHero: d.hostHero, hostMr: d.hostMr, hostGear: d.hostGear, hostUid: d.host };
-    }).then(function (info) {
-      const opp = { uid: info.hostUid, name: info.hostName || 'HOST', hero: info.hostHero || 'raka', mr: info.hostMr || 1000, gear: info.hostGear || null };
-      unsub = fs.onSnapshot(roomRef, function (snap) {
-        if (done || !snap.exists()) return;
-        const d = snap.data();
-        if (d.status === 'playing' && d.guest === uid) {
-          done = true; stop();
-          onFound({ role: 'guest', roomId: roomRef.id, opp: opp });
-        }
-      }, function (e) { if (!done) { done = true; stop(); onFail && onFail(String(e && e.code || e)); } });
-      // batas tunggu 60 dtk utk host memulai
-      setTimeout(function () {
-        if (!done) { done = true; stop(); onFail && onFail('timeout'); }
-      }, 60000);
-    }).catch(function (e) {
-      const m = String(e && e.message || e);
-      if (done) return; done = true;
-      onFail && onFail(m.indexOf('FULL') >= 0 ? 'full' : m.indexOf('NOT_FOUND') >= 0 ? 'notfound' : m);
-    });
+      const d = snap.data() || {};
+      if (d.status !== 'waiting') throw new Error('FULL');
+      if (d.host === uid) throw new Error('SELF');
+      if (d.guest || d.guestUid) throw new Error('FULL');
+      const opp = { uid:d.host, name:d.hostName || 'HOST', hero:d.hostHero || 'raka', mr:d.hostMr || 1000, gear:d.hostGear || null };
 
-    return { cancel: function () { if (!done) { done = true; stop(); onFail && onFail('cancel'); } } };
+      // CRITICAL: guest itself starts the room. Host is read-only from here.
+      return fs.updateDoc(roomRef, _clean({
+        status:'playing',
+        guest:uid, guestUid:uid,
+        guestName:(me.name || 'PEMAIN').slice(0,12), guestHero:me.hero || 'raka',
+        guestMr:isFinite(me.mr) ? me.mr : 1000, guestGear:me.gear || null,
+        names:{host:d.hostName || 'HOST', guest:(me.name || 'PEMAIN').slice(0,12)},
+        heroes:{host:d.hostHero || 'raka', guest:me.hero || 'raka'},
+        round:0, q:null, ans:null, skillReq:false, surrender:false,
+        seq:0, frame:null, winner:null, result:null,
+        hostAlive:Date.now(), guestAlive:Date.now(), updatedAt:Date.now()
+      })).then(function(){
+        if (onState) onState('starting');
+        // Guest does not wait for host. Both clients now see the same playing document.
+        finish({role:'guest', roomId:roomRef.id, opp:opp});
+      }).catch(function(e){ throw e; });
+    }).catch(function(e){
+      const m = String(e && (e.code || e.message) || e);
+      if (/NOT_FOUND|not-found/i.test(m)) fail('notfound');
+      else if (/FULL/i.test(m)) fail('full');
+      else if (/SELF/i.test(m)) fail('self');
+      else fail(m);
+    });
+    return { cancel:function(){ if (!done) { done=true; stop(); onFail && onFail('cancel'); } } };
   };
 
   /* ================= NET BATTLE ================= */

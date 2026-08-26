@@ -758,3 +758,6 @@ body {
   background: #eef2ff; color: #4338ca; border: 2px dashed #a5b4fc;
   border-radius: 14px; padding: 8px 14px 8px 22px; margin: 8px 0;
 }
+
+/* baris status koneksi pada modal PvP */
+.m-status { font-size: 13px; font-weight: 800; color: #4338ca; margin: 6px 0 2px; }

@@ -187,7 +187,13 @@
             function (err) {
               UI.closeModal();
               UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' :
-                       err === 'cancel' ? 'ℹ️ Dibatalkan' : '⚠️ Buat ruangan: ' + String(err).slice(0, 90));
+                       err === 'cancel' ? 'ℹ️ Dibatalkan' : err === 'permission-denied' ? '🔒 Firebase menolak akses room (Rules).' : '⚠️ Buat ruangan: ' + String(err).slice(0, 90));
+            },
+            function (st) {
+              if (st === 'joining') {
+                AU.play('rankup');
+                UI.setModalStatus('✅ Lawan masuk! Memulai pertandingan…');
+              }
             });
         } catch (e) {
           UI.closeModal();
@@ -209,7 +215,14 @@
               UI.closeModal();
               UI.toast(err === 'full' ? '⚠️ Ruangan sudah penuh' :
                        err === 'notfound' ? '⚠️ Kode tidak ditemukan' :
-                       err === 'timeout' ? '⌛ Host tidak merespons' : 'ℹ️ Dibatalkan');
+                       err === 'self' ? '⚠️ Tidak bisa bergabung ke room sendiri' :
+                       err === 'timeout' ? '⌛ Host tidak merespons' :
+                       /permission-denied/i.test(String(err)) ? '🔒 Firebase menolak akses ke room. Cek Firestore Rules.' :
+                       '⚠️ Gagal bergabung: ' + String(err).slice(0, 100));
+            },
+            function (st) {
+              if (st === 'claimed') { AU.play('skill'); UI.setModalStatus('✅ Terhubung ke ruangan! Menunggu host memulai…'); }
+              else if (st === 'starting') UI.setModalStatus('⚔️ Memulai pertandingan…');
             });
         });
         break;
