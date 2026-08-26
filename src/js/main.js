@@ -178,17 +178,21 @@
         if (!Bc || !Bc.online || !Bc._fb || !Bc.user) { UI.toast('ℹ️ Mode online belum aktif'); break; }
         AU.play('skill');
         let handle = null;
-        const me = () => ({ name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() });
-        UI.roomModal('.....', function () { if (handle) handle.cancel(); });
-        handle = ML.PVP.createRoom(Bc._fb, me(),
-          function (info) { UI.closeModal(); startNetBattle(info); },
-          function (err) {
-            UI.closeModal();
-            UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' : 'ℹ️ Dibatalkan');
-          });
-        // tampilkan kode asli begitu tersedia
-        const codeEl = U.$('.room-code');
-        if (codeEl && handle.code) codeEl.textContent = handle.code;
+        const me = { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() };
+        try {
+          const code = ML.PVP.makeCode();      // kode dibuat SEBELUM modal -> selalu tampil
+          UI.roomModal(code, function () { if (handle) handle.cancel(); });
+          handle = ML.PVP.createRoom(Bc._fb, me, code,
+            function (info) { UI.closeModal(); startNetBattle(info); },
+            function (err) {
+              UI.closeModal();
+              UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' :
+                       err === 'cancel' ? 'ℹ️ Dibatalkan' : '⚠️ ' + String(err).slice(0, 60));
+            });
+        } catch (e) {
+          UI.closeModal();
+          UI.toast('⚠️ Gagal membuat ruangan: ' + String((e && (e.code || e.message)) || e).slice(0, 60));
+        }
         break;
       }
 

@@ -40,9 +40,11 @@ const CFG = {
 
   console.log('\n🎮 A membuat ruangan…');
   let aInfo = null;
-  const h = ML.PVP.createRoom(A.fb, { name: 'ALFA', hero: 'lyra', mr: 1150, gear: { hpMul: 0.12 } }, i => { aInfo = i; }, e => { if (!aInfo) throw new Error('create fail ' + e); });
-  console.log('   KODE:', h.code);
-  assert.ok(/^[A-Z2-9]{5}$/.test(h.code), 'kode 5 karakter tanpa huruf membingungkan');
+  const KODE = ML.PVP.makeCode();
+  const h = ML.PVP.createRoom(A.fb, { name: 'ALFA', hero: 'lyra', mr: 1150, gear: { hpMul: 0.12 } }, KODE, i => { aInfo = i; }, e => { if (!aInfo) throw new Error('create fail ' + e); });
+  console.log('   KODE:', KODE);
+  assert.ok(/^[A-Z2-9]{5}$/.test(KODE), 'kode 5 karakter tanpa huruf membingungkan');
+  assert.strictEqual(h.code, KODE, 'handle membawa kode yang sama');
 
   await sleep(1500); // beri waktu dokumen waiting tersimpan
   console.log('🔑 B bergabung dengan kode…');

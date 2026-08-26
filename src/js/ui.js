@@ -241,7 +241,7 @@
       el('h-mascot').innerHTML = heroImg(P.heroDef());
       el('h-mr').textContent = pf.mr;
       const net = el('h-net');
-      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8 🟢 online' : 'v0.8 offline';
+      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8.2 🟢 online' : 'v0.8.2 offline';
     },
 
     /* ================= SETUP ================= */

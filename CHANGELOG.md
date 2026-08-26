@@ -5,6 +5,18 @@ Cara paling simpel untuk GitHub Pages: ganti 1 file `index.html` (hasil build su
 
 ---
 
+## v0.8.2 — FIX Kode Ruangan Tidak Muncul (hanya titik-titik) + Service Worker Tidak Memuat Versi Baru
+
+**Perbaikan (laporan pemain):**
+- 🐛 **Kode ruangan hanya menampilkan "....."** — kode kini dibuat SEBELUM modal ditampilkan sehingga selalu langsung terlihat (tanpa manipulasi DOM pasca-render); ditambah try/catch dengan pesan galat yang jelas bila Firestore menolak
+- 🐛 **Jebakan cache service worker**: nama cache tidak pernah berubah sejak v0.7 + strategi cache-first membuat pemain terjebak di versi lama setelah deploy. Kini: nama cache otomatis mengikuti versi game (`math-legends-0.8.2`) dan **halaman dimuat network-first** (versi baru selalu diambil saat online, cache hanya fallback offline)
+
+**File berubah:** `index.html` 🔁 · `src/js/pvp.js` (createRoom menerima kode eksplisit) · `src/js/main.js` (alur buat ruangan baru) · `src/js/data.js`, `src/js/ui.js`, `src/index.html` (versi 0.8.2) · `build.py` (SW versi otomatis + network-first) · `test/firebase-room-e2e.js` (signature baru)
+
+**Setelah deploy v0.8.2:** pemain lama tetap perlu **sekali muat ulang/hard-refresh** agar service worker lama digantikan; setelah itu update selalu otomatis.
+
+---
+
 ## v0.8.1 — FIX Arah LYRA + Kode Ruangan PvP (Buat/Gabung)
 
 **Perbaikan:**

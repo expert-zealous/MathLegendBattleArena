@@ -202,11 +202,12 @@
     return c;
   };
 
-  /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung */
-  PVP.createRoom = function (fb, me, onFound, onFail) {
+  /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung.
+     Kode dibuat PEMANGGIL (main.js) agar bisa ditampilkan SEBELUM menulis ke jaringan. */
+  PVP.createRoom = function (fb, me, code, onFound, onFail) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
     let unsub = null, done = false;
-    const code = PVP.makeCode();
+    code = String(code || PVP.makeCode()).toUpperCase();
     const roomRef = fs.doc(db, 'rooms', code);
 
     const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };

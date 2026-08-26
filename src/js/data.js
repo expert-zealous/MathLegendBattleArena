@@ -9,7 +9,7 @@
   const U = ML.util;
 
   ML.DATA = {
-    version: '0.8.1',
+    version: '0.8.2',
 
     /* ---------- HERO (5 hero, identitas original; gambar karakter di folder assets) ---------- */
     heroes: [

@@ -14,6 +14,10 @@ ROOT = pathlib.Path(__file__).parent
 SRC = ROOT / "src"
 OUT = ROOT / "index.html"
 
+# versi game (untuk nama cache service worker)
+import re as _re
+SWVER = _re.search(r"version: '([0-9.]+)'", (SRC / "js" / "data.js").read_text(encoding="utf-8")).group(1)
+
 html = (SRC / "index.html").read_text(encoding="utf-8")
 
 # inline CSS
@@ -70,18 +74,31 @@ if icons.exists():
     '}', encoding="utf-8")
 
 (ROOT / "sw.js").write_text(
-    """// MATH LEGENDS — service worker sederhana (cache-first untuk aset)
-const CACHE = 'math-legends-v0.7.0';
+    """// MATH LEGENDS — service worker (v0.8.2+)
+// Halaman: NETWORK-FIRST agar pemain selalu dapat versi terbaru;
+// aset lain: cache-first agar cepat & bisa offline.
+const CACHE = 'math-legends-__SWVER__';
 const ASSETS = ['./', './index.html', './manifest.json', './favicon-64.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.indexOf('math-legends-') === 0 && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return; // Firestore/CDN lewat jaringan
+  const isPage = e.request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html');
+  if (isPage) {
+    e.respondWith(
+      fetch(e.request).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match(e.request).then((h) => h || caches.match('./index.html')))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
       const copy = res.clone();
@@ -90,7 +107,7 @@ self.addEventListener('fetch', (e) => {
     }).catch(() => caches.match('./index.html')))
   );
 });
-""", encoding="utf-8")
+""".replace('__SWVER__', SWVER), encoding="utf-8")
 
 assert "<link rel=\"stylesheet\"" not in html, "CSS belum ter-inline!"
 body = html.split("<body>")[1]

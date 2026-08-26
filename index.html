@@ -823,7 +823,7 @@ body {
         <button class="tile" data-nav="shop"><b>🛍️</b><span>TOKO</span></button>
       </div>
 
-      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.8 offline</span></div>
+      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.8.2 offline</span></div>
       <button class="link-btn" data-act="watch">📺 Mode Wasit (tonton turnamen)</button>
     </div>
   </section>
@@ -1181,7 +1181,7 @@ body {
   const U = ML.util;
 
   ML.DATA = {
-    version: '0.8.1',
+    version: '0.8.2',
 
     /* ---------- HERO (5 hero, identitas original; gambar karakter di folder assets) ---------- */
     heroes: [
@@ -3168,11 +3168,12 @@ window.ML_FIREBASE_CONFIG = {
     return c;
   };
 
-  /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung */
-  PVP.createRoom = function (fb, me, onFound, onFail) {
+  /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung.
+     Kode dibuat PEMANGGIL (main.js) agar bisa ditampilkan SEBELUM menulis ke jaringan. */
+  PVP.createRoom = function (fb, me, code, onFound, onFail) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
     let unsub = null, done = false;
-    const code = PVP.makeCode();
+    code = String(code || PVP.makeCode()).toUpperCase();
     const roomRef = fs.doc(db, 'rooms', code);
 
     const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
@@ -3876,7 +3877,7 @@ window.ML_FIREBASE_CONFIG = {
       el('h-mascot').innerHTML = heroImg(P.heroDef());
       el('h-mr').textContent = pf.mr;
       const net = el('h-net');
-      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8 🟢 online' : 'v0.8 offline';
+      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8.2 🟢 online' : 'v0.8.2 offline';
     },
 
     /* ================= SETUP ================= */
@@ -4709,17 +4710,21 @@ window.ML_FIREBASE_CONFIG = {
         if (!Bc || !Bc.online || !Bc._fb || !Bc.user) { UI.toast('ℹ️ Mode online belum aktif'); break; }
         AU.play('skill');
         let handle = null;
-        const me = () => ({ name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() });
-        UI.roomModal('.....', function () { if (handle) handle.cancel(); });
-        handle = ML.PVP.createRoom(Bc._fb, me(),
-          function (info) { UI.closeModal(); startNetBattle(info); },
-          function (err) {
-            UI.closeModal();
-            UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' : 'ℹ️ Dibatalkan');
-          });
-        // tampilkan kode asli begitu tersedia
-        const codeEl = U.$('.room-code');
-        if (codeEl && handle.code) codeEl.textContent = handle.code;
+        const me = { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() };
+        try {
+          const code = ML.PVP.makeCode();      // kode dibuat SEBELUM modal -> selalu tampil
+          UI.roomModal(code, function () { if (handle) handle.cancel(); });
+          handle = ML.PVP.createRoom(Bc._fb, me, code,
+            function (info) { UI.closeModal(); startNetBattle(info); },
+            function (err) {
+              UI.closeModal();
+              UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' :
+                       err === 'cancel' ? 'ℹ️ Dibatalkan' : '⚠️ ' + String(err).slice(0, 60));
+            });
+        } catch (e) {
+          UI.closeModal();
+          UI.toast('⚠️ Gagal membuat ruangan: ' + String((e && (e.code || e.message)) || e).slice(0, 60));
+        }
         break;
       }
 
