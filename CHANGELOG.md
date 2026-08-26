@@ -1,3 +1,8 @@
+
+## Audio/PvP room fix — 2026-08-27
+- Hardened coded-room host transition WAITING → PLAYING with an atomic Firestore transaction.
+- Host now accepts either `guest` or `guestUid` and has a recovery path if the room is already `playing`.
+- Guest accepts either room guest field when detecting the transition.
 # 📋 CHANGELOG — MATH LEGENDS: BATTLE ARENA
 
 Panduan update untuk pengguna: **cukup ganti file yang tercantum di versi baru**.
