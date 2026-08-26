@@ -43,6 +43,7 @@ Gambar karakter ada di `assets/heroes/` — bisa diganti sesuai **CHARACTERS.md*
 - **Diagnostik & rekomendasi** — akurasi per materi, pembahasan soal yang salah, saran latihan
 - **Audio sintesis** ringan (WebAudio, tanpa file), tombol 🔊 on/off
 - Simpan otomatis di **localStorage**; main ulang tanpa refresh
+- 🎵 Musik menu & battle + SFX per hero — file milikmu tinggal ditaruh di `assets/audio/` (lihat **AUDIO.md**)
 
 ## 🚀 Menjalankan
 

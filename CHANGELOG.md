@@ -5,6 +5,35 @@ Cara paling simpel untuk GitHub Pages: ganti 1 file `index.html` (hasil build su
 
 ---
 
+## v0.8.1 — FIX Arah LYRA + Kode Ruangan PvP (Buat/Gabung)
+
+**Perbaikan:**
+- 🔁 **LYRA menghadap salah** (gambarnya memang menghadap kiri, kebalikan hero lain) — kini tiap hero punya flag `flip`; sisi kiri selalu menghadap kanan & sisi kanan selalu menghadap kiri, termasuk pose menyerang
+- 🌐 **Sistem KODE RUANGAN** (permintaan pengguna): **🎮 BUAT RUANGAN** menghasilkan kode 5 karakter (tanpa huruf membingungkan I/O/0/1) → **🔑 GABUNG KODE** di perangkat kedua → langsung bertanding; wasit bisa menonton dengan kode yang sama; ruangan hangus otomatis 3 menit tanpa lawan; kode salah ditolak jelas ("Kode tidak ditemukan"/"Ruangan penuh")
+- Cari-lawan otomatis tetap tersedia (⚡) — keduanya teruji end-to-end ke Firebase
+
+**Catatan penting penggunaan online:** gunakan **2 perangkat berbeda** (atau 1 biasa + 1 incognito). Dua tab di browser yang sama = 1 akun anonim yang sama = tidak akan berpasangan. Pastikan deploy memakai zip terbaru (v0.6.0 lama memuat bug matchmaking yang telah diperbaiki).
+
+**File berubah/baru:** `index.html` 🔁 · BARU: `test/firebase-room-e2e.js` · ganti: `src/js/pvp.js` (createRoom/joinRoom), `src/js/ui.js` (heroBody sadar sisi, modal input & kode), `src/js/main.js` (aksi buat/gabung), `src/js/data.js` (flag flip LYRA), `src/index.html`, `src/css/style.css`, `CHANGELOG.md`
+
+---
+
+## v0.8.0 — Musuh Menghadap Pemain + Sistem Musik & SFX per Hero
+
+**Perbaikan visual:**
+- 🔁 Karakter lawan di arena kini **dicerminkan (menghadap kiri)** sehingga kedua hero saling berhadapan — termasuk pose menyerang & arah serangannya
+
+**Sistem audio baru (dua lapis):**
+- 🎵 **Musik latar**: `menu.mp3` (layar pembuka/beranda/pilih hero) & `battle.mp3` (pertandingan AI/PvP/wasit) — otomatis berganti, loop, volume 32%
+- 🏆 **SFX file**: `victory.mp3` & `defeat.mp3` menggantikan jingle sintesis bila tersedia
+- ⚔️ **Suara serangan khas tiap hero** — SEKARANG sudah berbeda (sintesis): RAKA benturan perisai, LYRA ledakan api, SENA senar busur, KAGE sabetan katana, MORRU aura jiwa — dan bisa diganti file `atk-*.mp3` milikmu
+- 🎚️ Dua toggle terpisah di PROFIL: **🔊 EFEK SUARA** dan **🎵 MUSIK** (tersimpan di profil)
+- File audio TIDAK di-inline: taruh di `assets/audio/` sesuai **AUDIO.md** lalu deploy — tanpa ubah kode, tanpa build ulang; tanpa file pun game tetap bersuara (fallback sintesis penuh)
+
+**File berubah/baru:** `index.html` 🔁 · BARU: `AUDIO.md`, `assets/audio/` (README) · ganti: `src/js/audio.js` (ditulis ulang), `src/js/ui.js`, `src/js/main.js`, `src/js/data.js`, `src/index.html`, `src/css/style.css`
+
+---
+
 ## v0.7.0 — PWA + Logo & Favicon + Toko Atribut + Karakter Tubuh Utuh + Mode Wasit + HP Besar
 
 **Fitur baru:**

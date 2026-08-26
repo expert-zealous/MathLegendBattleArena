@@ -18,6 +18,7 @@
 
   /* ---------- akhir pertandingan (dipakai AI & PvP) ---------- */
   function onEngineEnd(engine, res, keepCfg) {
+    AU.musicStop();
     App.lastResult = res;
     if (keepCfg) App.lastCfg = keepCfg; else App.lastCfg = null;
     setTimeout(function () {
@@ -41,6 +42,7 @@
     UI.attachBattle(battle);
     battle.on('end', function (res) { onEngineEnd(battle, res, cfg); });
     battle.start();
+    AU.music('battle');
     UI.show('battle');
   }
 
@@ -66,9 +68,11 @@
       if (App.battle === net) App.battle = null;
       UI.closeModal();
       UI.toast('⚠️ Lawan terputus — pertandingan dibatalkan');
+      AU.music('menu');
       UI.show('home');
     });
     net.start();
+    AU.music('battle');
     UI.show('battle');
     UI.toast('⚔️ Lawan: ' + U.esc(info.opp.name));
   }
@@ -93,6 +97,7 @@
       if (root) root.classList.remove('mode-watch');
       const h = d.host || {}, g = d.guest || {};
       const nm = function (x) { return U.esc(x && (x.oppName || x.playerName) || ''); };
+      AU.musicStop();
       UI.confirmModal('🏁 Pertandingan Selesai',
         (d.winner === 'host' ? '🏆 <b>' + nm(h) + '</b> (host) menang!' :
          d.winner === 'guest' ? '🏆 <b>' + (U.esc(g.playerName || 'GUEST')) + '</b> (guest) menang!' : 'Seri!') +
@@ -104,9 +109,11 @@
       if (App.battle === net) App.battle = null;
       if (root) root.classList.remove('mode-watch');
       UI.toast('⚠️ Siaran berakhir (pemain terputus)');
+      AU.music('menu');
       UI.show('home');
     });
     net.start();
+    AU.music('battle');
     UI.show('battle');
     UI.toast('📺 Mode wasit aktif — ruangan ' + roomId.slice(0, 6).toUpperCase());
   }
@@ -127,6 +134,7 @@
       case 'intro-start': {
         AU._ensure(); // buka AudioContext pada interaksi pertama
         AU.play('rankup');
+        AU.music('menu');
         if (!P.data.name) {
           UI.nameModal(function (name) {
             P.data.name = name;
@@ -161,6 +169,44 @@
           topicFocus: s.mode === 'practice' ? s.topic : null,
           practice: s.mode === 'practice',
           playerName: P.data.name
+        });
+        break;
+      }
+
+      case 'pvp-create': {
+        const Bc = ML.Backend;
+        if (!Bc || !Bc.online || !Bc._fb || !Bc.user) { UI.toast('ℹ️ Mode online belum aktif'); break; }
+        AU.play('skill');
+        let handle = null;
+        const me = () => ({ name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() });
+        UI.roomModal('.....', function () { if (handle) handle.cancel(); });
+        handle = ML.PVP.createRoom(Bc._fb, me(),
+          function (info) { UI.closeModal(); startNetBattle(info); },
+          function (err) {
+            UI.closeModal();
+            UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' : 'ℹ️ Dibatalkan');
+          });
+        // tampilkan kode asli begitu tersedia
+        const codeEl = U.$('.room-code');
+        if (codeEl && handle.code) codeEl.textContent = handle.code;
+        break;
+      }
+
+      case 'pvp-join': {
+        const Bj = ML.Backend;
+        if (!Bj || !Bj.online || !Bj._fb || !Bj.user) { UI.toast('ℹ️ Mode online belum aktif'); break; }
+        AU.play('click');
+        UI.inputModal('🔑 Gabung Ruangan', 'Masukkan kode 5 karakter dari pembuat ruangan.', 'KODE', 'GABUNG ⚔️', function (code) {
+          let handle = null;
+          UI.searchingModal(function () { if (handle) handle.cancel(); });
+          handle = ML.PVP.joinRoom(Bj._fb, { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() }, code,
+            function (info) { UI.closeModal(); startNetBattle(info); },
+            function (err) {
+              UI.closeModal();
+              UI.toast(err === 'full' ? '⚠️ Ruangan sudah penuh' :
+                       err === 'notfound' ? '⚠️ Kode tidak ditemukan' :
+                       err === 'timeout' ? '⌛ Host tidak merespons' : 'ℹ️ Dibatalkan');
+            });
         });
         break;
       }
@@ -245,6 +291,16 @@
         });
         break;
 
+      case 'toggle-music':
+        AU.musicEnabled = !AU.musicEnabled;
+        P.data.settings.music = AU.musicEnabled;
+        P.save();
+        if (!AU.musicEnabled) AU.musicStop();
+        else AU.music(UI.current === 'battle' ? 'battle' : 'menu');
+        UI.renderProfile();
+        UI.toast(AU.musicEnabled ? '🎵 Musik aktif' : '🎵 Musik mati');
+        break;
+
       case 'toggle-sound':
         AU.enabled = !AU.enabled;
         P.data.settings.sound = AU.enabled;
@@ -302,6 +358,7 @@
     const nav = t.getAttribute('data-nav');
     if (nav) {
       AU.play('click');
+      if (nav === 'home') AU.music('menu');
       // keluar dari battle tanpa menyerah = pertandingan dibatalkan
       if (App.battle && nav !== 'battle') endBattleSilently();
       if (nav === 'setup') {
@@ -340,6 +397,8 @@
   function boot() {
     P.load();
     AU.enabled = P.data.settings.sound !== false;
+    AU.musicEnabled = P.data.settings.music !== false;
+    AU.probeFiles(); // deteksi file musik/SFX milikmu di assets/audio/
     App.setup.heroId = P.data.hero || 'raka';
 
     // buka AudioContext pada interaksi pertama (kebijakan autoplay)

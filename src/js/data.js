@@ -9,7 +9,7 @@
   const U = ML.util;
 
   ML.DATA = {
-    version: '0.7.0',
+    version: '0.8.1',
 
     /* ---------- HERO (5 hero, identitas original; gambar karakter di folder assets) ---------- */
     heroes: [
@@ -25,7 +25,7 @@
       },
       {
         id: 'lyra', name: 'LYRA', role: 'MAGE', title: 'Spesialis Serangan Besar',
-        emoji: '🔥', img: 'assets/heroes/lyra.png', imgF: 'assets/heroes/lyra-f.png', imgA: 'assets/heroes/lyra-a.png', color: '#ea580c', color2: '#fb923c',
+        emoji: '🔥', flip: true, img: 'assets/heroes/lyra.png', imgF: 'assets/heroes/lyra-f.png', imgA: 'assets/heroes/lyra-a.png', color: '#ea580c', color2: '#fb923c',
         hp: 145, atk: 23, def: 2,
         passive: { name: 'Naluri Api', desc: 'Peluang CRITICAL +12%.' },
         skill: {

@@ -19,10 +19,16 @@
   }
 
   // gambar tubuh utuh utk arena (imgF = siap, imgA = menyerang)
-  function heroBody(h) {
+  // side 'p' (kiri) harus menghadap KANAN; side 'e' (kanan) harus menghadap KIRI.
+  // Sebagian hero (LYRA) tergambar menghadap kiri -> dicerminkan lewat flip:true.
+  function heroBody(h, side) {
     if (!h) return '';
-    if (h.imgF) return '<img class="hero-img" src="' + h.imgF + '" data-atk="' + (h.imgA || h.imgF) + '" data-idle="' + h.imgF + '" draggable="false">';
-    return heroImg(h);
+    if (!h.imgF) return heroImg(h);
+    let t = '';
+    const facesLeft = !!h.flip;           // arah asli gambar
+    const wantLeft = side === 'e';        // arah yang dibutuhkan di arena
+    if (facesLeft !== wantLeft) t = ' style="transform:scaleX(-1)"';
+    return '<img class="hero-img" src="' + h.imgF + '" data-atk="' + (h.imgA || h.imgF) + '" data-idle="' + h.imgF + '"' + t + ' draggable="false">';
   }
 
   // gambar hero (fallback ke emoji bila file tak tersedia)
@@ -124,6 +130,54 @@
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     },
 
+    /* modal input generik (kode ruangan / gabung / wasit) */
+    inputModal: function (title, desc, placeholder, btnLabel, cb) {
+      const self = this;
+      const bd = this.modal(
+        '<h3>' + title + '</h3><p>' + desc + '</p>' +
+        '<input id="im-input" maxlength="40" placeholder="' + esc(placeholder) + '" autocomplete="off">' +
+        '<div class="m-actions">' +
+        '<button class="btn ghost" data-mact="no">BATAL</button>' +
+        '<button class="btn primary" data-mact="go">' + esc(btnLabel) + '</button></div>'
+      );
+      const input = bd.querySelector('#im-input');
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 60);
+      function go() {
+        const v = (input.value || '').trim();
+        self.closeModal();
+        if (v) cb(v);
+      }
+      bd.addEventListener('click', function (e) {
+        const b = e.target.closest('[data-mact]');
+        if (!b) return;
+        const a = b.getAttribute('data-mact');
+        self.closeModal();
+        if (a === 'go') go();
+      });
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    },
+
+    /* menunggu lawan di ruangan buatan (tampilkan kode besar) */
+    roomModal: function (code, onCancel) {
+      const self = this;
+      const bd = this.modal(
+        '<div style="text-align:center">' +
+        '<div class="spinner"></div>' +
+        '<h3 style="margin-top:12px">🎮 Ruangan dibuat!</h3>' +
+        '<p>Berikan kode ini kepada lawan:<br>' +
+        '<b class="room-code">' + esc(code) + '</b></p>' +
+        '<p class="page-desc small">Lawan: MAIN → 🌐 GABUNG KODE → masuk ' + esc(code) + '.<br>Wasit: 📺 Mode Wasit → kode yang sama.</p>' +
+        '<div class="m-actions"><button class="btn ghost" data-mact="cancel">BATAL</button></div>' +
+        '</div>'
+      );
+      bd.addEventListener('click', function (e) {
+        if (e.target.closest('[data-mact="cancel"]')) {
+          self.closeModal();
+          if (onCancel) onCancel();
+        }
+      });
+    },
+
     /* modal wasit: masukkan kode ruangan */
     watchModal: function (cb) {
       const self = this;
@@ -187,7 +241,7 @@
       el('h-mascot').innerHTML = heroImg(P.heroDef());
       el('h-mr').textContent = pf.mr;
       const net = el('h-net');
-      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.7 🟢 online' : 'v0.7 offline';
+      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8 🟢 online' : 'v0.8 offline';
     },
 
     /* ================= SETUP ================= */
@@ -379,7 +433,8 @@
 
       el('pf-topics').innerHTML = '<h3>📈 PENGUASAAN MATERI</h3>' + this.topicBars(pf.perTopic, true);
 
-      el('pf-sound').innerHTML = AU.enabled ? '🔊 SUARA: ON' : '🔇 SUARA: OFF';
+      el('pf-sound').innerHTML = AU.enabled ? '🔊 EFEK SUARA: ON' : '🔇 EFEK SUARA: OFF';
+      el('pf-music').innerHTML = AU.musicEnabled ? '🎵 MUSIK: ON' : '🎵 MUSIK: OFF';
     },
 
     /* ---------- helper kecil ---------- */
@@ -545,14 +600,15 @@
       rp.style.borderColor = p.hero.color2; re.style.borderColor = '#fda4af';
       el('b-p-name').textContent = (engine.cfg.playerName || 'KAMU');
       el('b-e-name').textContent = '🤖 ' + engine.ai.level.bot;
-      el('b-hero-p').innerHTML = heroBody(p.hero);
-      el('b-hero-e').innerHTML = heroBody(e.hero);
+      el('b-hero-p').innerHTML = heroBody(p.hero, 'p');
+      el('b-hero-e').innerHTML = heroBody(e.hero, 'e');
       const code = el('b-code'), live = el('b-live');
       const pvp = engine.cfgPvp;
       if (code && live) {
         if (pvp && pvp.role !== 'watch') {
           code.style.display = '';
-          code.textContent = 'KODE ' + String(pvp.roomId || '').slice(0, 6).toUpperCase();
+          const rid = String(pvp.roomId || '');
+          code.textContent = 'KODE ' + (rid.length <= 6 ? rid.toUpperCase() : rid.slice(0, 6).toUpperCase());
         } else code.style.display = 'none';
         live.style.display = (pvp && pvp.role === 'watch') ? '' : 'none';
       }
@@ -781,7 +837,9 @@
         if (last && last.parentNode) last.parentNode.removeChild(last);
       }, 950);
 
-      AU.play(d.crit || d.meteor ? 'crit' : 'attack');
+      // efek suara khas hero penyerang (file milikmu bila ada, sintesis bila tidak)
+      const atkHero = d.from === 'p' ? engine.p.hero.id : engine.e.hero.id;
+      AU.heroAttack(atkHero, d.crit || d.meteor);
     },
 
     /* efek serangan khas tiap hero: proyektil / tebasan (elemen tunggal, dibersihkan otomatis) */

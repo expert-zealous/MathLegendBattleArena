@@ -192,6 +192,111 @@
     }
   });
 
+  /* ================= RUANGAN BERKODE (buat/gabung manual) =================
+     Cocok untuk uji 2 perangkat & turnamen: kode 5 karakter, deterministik. */
+  const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // tanpa huruf mirip (I,O,0,1)
+
+  PVP.makeCode = function () {
+    let c = '';
+    for (let i = 0; i < 5; i++) c += ABC[Math.floor(Math.random() * ABC.length)];
+    return c;
+  };
+
+  /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung */
+  PVP.createRoom = function (fb, me, onFound, onFail) {
+    const fs = fb.fs, db = fb.db, uid = fb.uid;
+    let unsub = null, done = false;
+    const code = PVP.makeCode();
+    const roomRef = fs.doc(db, 'rooms', code);
+
+    const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
+    const finish = function (v) { if (done) return; done = true; stop(); if (v) onFound(v); else onFail && onFail('cancel'); };
+
+    fs.setDoc(roomRef, {
+      status: 'waiting', host: uid, hostName: me.name, hostHero: me.hero,
+      hostMr: me.mr || 1000, hostGear: me.gear || null,
+      guest: null, guestName: null, guestHero: null, guestMr: null, guestGear: null,
+      createdAt: Date.now(), updatedAt: Date.now()
+    }).then(function () {
+      unsub = fs.onSnapshot(roomRef, function (snap) {
+        if (done || !snap.exists()) return;
+        const d = snap.data();
+        if (d.guest && d.guestUid) {
+          const opp = { uid: d.guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka', mr: d.guestMr || 1000, gear: d.guestGear || null };
+          // ubah ke ruangan pertandingan aktif (format NetBattle)
+          fs.setDoc(roomRef, {
+            status: 'playing', host: uid, guest: opp.uid,
+            names: { host: me.name, guest: opp.name },
+            heroes: { host: me.hero, guest: opp.hero },
+            round: 0, q: null, ans: null, skillReq: false, surrender: false,
+            seq: 0, frame: null, winner: null, result: null,
+            hostAlive: Date.now(), guestAlive: Date.now(), updatedAt: Date.now()
+          }).then(function () {
+            finish({ role: 'host', roomId: code, opp: opp });
+          }).catch(function (e) { if (!done) { done = true; stop(); onFail && onFail(String(e && e.code || e)); } });
+        }
+      }, function (e) { if (!done) { done = true; onFail && onFail(String(e && e.code || e)); } });
+      // kedaluwarsa otomatis bila tak ada lawan dalam 3 menit
+      setTimeout(function () {
+        if (done) return;
+        fs.getDoc(roomRef).then(function (snap) {
+          if (!done && snap.exists() && snap.data().status === 'waiting') {
+            fs.deleteDoc(roomRef).catch(function () {});
+            done = true; stop(); onFail && onFail('timeout');
+          }
+        }).catch(function () {});
+      }, 180000);
+    }).catch(function (e) { if (!done) { done = true; onFail && onFail(String(e && e.code || e)); } });
+
+    return {
+      code: code,
+      cancel: function () {
+        finish(null);
+        try { fs.deleteDoc(roomRef).catch(function () {}); } catch (e) {}
+      }
+    };
+  };
+
+  /* GUEST: gabung dengan kode -> cb({role:'guest', roomId, opp}) saat host memulai */
+  PVP.joinRoom = function (fb, me, code, onFound, onFail) {
+    const fs = fb.fs, db = fb.db, uid = fb.uid;
+    const roomRef = fs.doc(db, 'rooms', String(code || '').trim().toUpperCase());
+    let unsub = null, done = false;
+    const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
+
+    fs.runTransaction(db, async function (tx) {
+      const snap = await tx.get(roomRef);
+      if (!snap.exists()) throw new Error('NOT_FOUND');
+      const d = snap.data();
+      if (d.status !== 'waiting' || d.guest) throw new Error('FULL');
+      tx.update(roomRef, {
+        guest: uid, guestUid: uid, guestName: me.name, guestHero: me.hero,
+        guestMr: me.mr || 1000, guestGear: me.gear || null, updatedAt: Date.now()
+      });
+      return { hostName: d.hostName, hostHero: d.hostHero, hostMr: d.hostMr, hostGear: d.hostGear, hostUid: d.host };
+    }).then(function (info) {
+      const opp = { uid: info.hostUid, name: info.hostName || 'HOST', hero: info.hostHero || 'raka', mr: info.hostMr || 1000, gear: info.hostGear || null };
+      unsub = fs.onSnapshot(roomRef, function (snap) {
+        if (done || !snap.exists()) return;
+        const d = snap.data();
+        if (d.status === 'playing' && d.guest === uid) {
+          done = true; stop();
+          onFound({ role: 'guest', roomId: roomRef.id, opp: opp });
+        }
+      }, function (e) { if (!done) { done = true; stop(); onFail && onFail(String(e && e.code || e)); } });
+      // batas tunggu 60 dtk utk host memulai
+      setTimeout(function () {
+        if (!done) { done = true; stop(); onFail && onFail('timeout'); }
+      }, 60000);
+    }).catch(function (e) {
+      const m = String(e && e.message || e);
+      if (done) return; done = true;
+      onFail && onFail(m.indexOf('FULL') >= 0 ? 'full' : m.indexOf('NOT_FOUND') >= 0 ? 'notfound' : m);
+    });
+
+    return { cancel: function () { if (!done) { done = true; stop(); onFail && onFail('cancel'); } } };
+  };
+
   /* ================= NET BATTLE ================= */
   const NetBattle = (ML.NetBattle = class extends ML.Emitter {
     /* cfg: { fb, role:'host'|'guest', roomId, myHeroId, myName, opp:{uid,name,hero,mr} } */

@@ -61,7 +61,7 @@
         <button class="tile" data-nav="shop"><b>🛍️</b><span>TOKO</span></button>
       </div>
 
-      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.7 offline</span></div>
+      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.8 offline</span></div>
       <button class="link-btn" data-act="watch">📺 Mode Wasit (tonton turnamen)</button>
     </div>
   </section>
@@ -81,8 +81,12 @@
       <div class="ai-chips" id="su-ai"></div>
       <div class="su-online" id="su-online" style="display:none">
         <h3 class="su-label">🌐 LAWAN SUNGGUHAN (ONLINE)</h3>
-        <button class="btn big online" data-act="pvp-search">🌐 CARI LAWAN 1v1</button>
-        <p class="page-desc small">Lawan pemain lain lewat Firebase — hero yang sedang dipilih akan dipakai.</p>
+        <div class="pvp-row">
+          <button class="btn online" data-act="pvp-search">⚡ CARI LAWAN OTOMATIS</button>
+          <button class="btn ghost" data-act="pvp-create">🎮 BUAT RUANGAN (KODE)</button>
+          <button class="btn ghost" data-act="pvp-join">🔑 GABUNG KODE</button>
+        </div>
+        <p class="page-desc small">Gunakan 2 perangkat berbeda (bukan 2 tab di browser yang sama). Kode ruangan juga bisa ditonton wasit via 📺 Mode Wasit.</p>
       </div>
       <button class="btn big primary" data-act="start-battle" id="su-start">⚔️ MULAI BATTLE</button>
     </div>
@@ -266,7 +270,8 @@
       <div class="panel res-stats" id="pf-stats"></div>
       <div class="panel res-box" id="pf-topics"></div>
       <div class="panel pf-settings">
-        <button class="btn ghost wide" id="pf-sound" data-act="toggle-sound">🔊 SUARA: ON</button>
+        <button class="btn ghost wide" id="pf-sound" data-act="toggle-sound">🔊 EFEK SUARA: ON</button>
+        <button class="btn ghost wide" id="pf-music" data-act="toggle-music">🎵 MUSIK: ON</button>
         <button class="btn danger wide" data-act="reset-progress">🗑️ RESET PROGRES</button>
       </div>
     </div>
