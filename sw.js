@@ -1,7 +1,7 @@
 // MATH LEGENDS — service worker (v0.8.2+)
 // Halaman: NETWORK-FIRST agar pemain selalu dapat versi terbaru;
 // aset lain: cache-first agar cepat & bisa offline.
-const CACHE = 'math-legends-0.8.4';
+const CACHE = 'math-legends-0.8.4-pvpfix8';
 const ASSETS = ['./', './index.html', './manifest.json', './favicon-64.png', './icon-192.png', './icon-512.png',
   './assets/audio/menu.mp3', './assets/audio/battle.mp3', './assets/audio/victory.mp3', './assets/audio/defeat.mp3',
   './assets/audio/atk-raka.mp3', './assets/audio/atk-lyra.mp3', './assets/audio/atk-sena.mp3', './assets/audio/atk-kage.mp3', './assets/audio/atk-morru.mp3'];

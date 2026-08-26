@@ -227,11 +227,13 @@
      Host only observes. This removes the old host-side write/transaction race. */
   PVP.createRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
-    let unsub = null, poll = null, timer = null, done = false;
-    code = String(code || PVP.makeCode()).trim().toUpperCase();
+    let unsubRoom = null, unsubMM = null, poll = null, timer = null, done = false;
+    code = String(code || PVP.makeCode()).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     const roomRef = fs.doc(db, 'rooms', code);
+    const mmRef = fs.doc(db, 'matchmaking', uid);
     const stop = function () {
-      if (unsub) { try { unsub(); } catch(e) {} unsub = null; }
+      if (unsubRoom) { try { unsubRoom(); } catch(e) {} unsubRoom = null; }
+      if (unsubMM) { try { unsubMM(); } catch(e) {} unsubMM = null; }
       if (poll) { clearInterval(poll); poll = null; }
       if (timer) { clearTimeout(timer); timer = null; }
     };
@@ -244,24 +246,65 @@
     };
     const finish = function(v) {
       if (done) return;
-      done = true; stop();
-      onFound && onFound(v);
+      done = true; stop(); onFound && onFound(v);
     };
-    const consume = function(snap) {
-      if (done || !snap || !snap.exists()) return;
-      const d = snap.data() || {};
-      if (G.console) console.log('[ML PVP HOST ROOM]', code, d.status, d.guestUid || d.guest || null);
-      const guestUid = d.guestUid || d.guest;
-      if (!guestUid || guestUid === uid) return;
+
+    const startBattleIfJoined = function(d) {
+      if (done || !d) return false;
+      const guestUid = d.guestUid || d.guest || null;
+      if (!guestUid || guestUid === uid) return false;
+      if (d.status !== 'playing') return false;
       const opp = {
-        uid: guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka',
-        mr: d.guestMr || 1000, gear: d.guestGear || null
+        uid: guestUid,
+        name: d.guestName || (d.names && d.names.guest) || 'GUEST',
+        hero: d.guestHero || (d.heroes && d.heroes.guest) || 'raka',
+        mr: d.guestMr || 1000,
+        gear: d.guestGear || null
       };
-      if (d.status === 'playing') {
-        if (onState) onState('starting');
-        finish({ role:'host', roomId:code, opp:opp });
-      }
+      if (G.console) console.log('[ML PVP HOST] GUEST CONFIRMED', code, opp.uid);
+      if (onState) onState('starting');
+      finish({ role:'host', roomId:code, opp:opp });
+      return true;
     };
+
+    const promoteFromMatchmaking = function(mm) {
+      if (done || !mm || !mm.matched || !mm.opponent) return;
+      const guestUid = mm.opponent;
+      fs.getDoc(roomRef).then(function(snap) {
+        if (done || !snap.exists()) return;
+        const d = snap.data() || {};
+        if ((d.guestUid || d.guest) && d.status === 'playing') {
+          startBattleIfJoined(d); return;
+        }
+        // Host is authoritative: convert waiting -> playing and preserve guest data.
+        return fs.setDoc(roomRef, _clean({
+          status:'playing', host:uid, guest:guestUid, guestUid:guestUid,
+          guestName:mm.oppName || d.guestName || 'GUEST',
+          guestHero:mm.oppHero || d.guestHero || 'raka',
+          guestMr:isFinite(mm.oppMr) ? mm.oppMr : (d.guestMr || 1000),
+          guestGear:mm.oppGear || d.guestGear || null,
+          names:{host:me.name || 'PEMAIN', guest:mm.oppName || d.guestName || 'GUEST'},
+          heroes:{host:me.hero || 'raka', guest:mm.oppHero || d.guestHero || 'raka'},
+          round:0, q:null, ans:null, skillReq:false, surrender:false,
+          seq:0, frame:null, winner:null, result:null,
+          hostAlive:Date.now(), guestAlive:Date.now(), updatedAt:Date.now()
+        }), {merge:true}).then(function(){
+          startBattleIfJoined({
+            status:'playing', guest:guestUid, guestUid:guestUid,
+            guestName:mm.oppName || d.guestName, guestHero:mm.oppHero || d.guestHero,
+            guestMr:mm.oppMr || d.guestMr, guestGear:mm.oppGear || d.guestGear
+          });
+        });
+      }).catch(function(e){
+        if (G.console) console.warn('[ML PVP HOST MM]', e && (e.code || e.message) || e);
+      });
+    };
+
+    fs.setDoc(mmRef, _clean({
+      uid:uid, name:(me.name || 'PEMAIN').slice(0,12), hero:me.hero || 'raka',
+      mr:isFinite(me.mr) ? me.mr : 1000, gear:me.gear || null,
+      matched:false, opponent:null, updatedAt:Date.now()
+    }), {merge:true}).catch(function(){});
 
     fs.setDoc(roomRef, _clean({
       status:'waiting', host:uid,
@@ -271,19 +314,33 @@
       createdAt:Date.now(), updatedAt:Date.now()
     })).then(function(){
       if (onState) onState('waiting');
-      unsub = fs.onSnapshot(roomRef, consume, fail);
+      // Primary channel: room document.
+      unsubRoom = fs.onSnapshot(roomRef, function(snap){
+        if (!snap.exists()) return;
+        const d = snap.data() || {};
+        if (G.console) console.log('[ML PVP HOST ROOM]', code, d.status, d.guestUid || d.guest || null);
+        startBattleIfJoined(d);
+      }, function(e){
+        if (G.console) console.error('[ML PVP HOST ROOM LISTENER]', e && (e.code || e.message) || e);
+      });
+      // Secondary channel: matchmaking host document. This avoids a single room-listener failure blocking the handshake.
+      unsubMM = fs.onSnapshot(mmRef, function(snap){
+        if (snap.exists()) promoteFromMatchmaking(snap.data() || {});
+      }, function(e){
+        if (G.console) console.error('[ML PVP HOST MM LISTENER]', e && (e.code || e.message) || e);
+      });
       poll = setInterval(function(){
         if (done) return;
-        fs.getDoc(roomRef).then(consume).catch(function(e){
-          if (G.console) console.warn('[ML PVP HOST POLL]', e && (e.code || e.message) || e);
-        });
-      }, 750);
+        Promise.all([
+          fs.getDoc(roomRef).then(function(s){ if (s.exists()) startBattleIfJoined(s.data() || {}); }).catch(function(e){ if(G.console) console.warn('[ML PVP HOST POLL ROOM]', e && (e.code || e.message) || e); }),
+          fs.getDoc(mmRef).then(function(s){ if (s.exists()) promoteFromMatchmaking(s.data() || {}); }).catch(function(e){ if(G.console) console.warn('[ML PVP HOST POLL MM]', e && (e.code || e.message) || e); })
+        ]);
+      }, 1000);
       timer = setTimeout(function(){
         if (done) return;
         fs.getDoc(roomRef).then(function(snap){
-          const d = snap.exists() ? snap.data() : null;
-          if (d && d.status === 'playing' && (d.guestUid || d.guest)) return consume(snap);
-          if (snap.exists()) fs.deleteDoc(roomRef).catch(function(){});
+          if (snap.exists() && startBattleIfJoined(snap.data() || {})) return;
+          fs.deleteDoc(roomRef).catch(function(){});
           fail('timeout');
         }).catch(fail);
       }, 180000);
@@ -293,6 +350,7 @@
       if (done) return;
       done = true; stop();
       fs.deleteDoc(roomRef).catch(function(){});
+      fs.deleteDoc(mmRef).catch(function(){});
       onFail && onFail('cancel');
     }};
   };
@@ -303,6 +361,7 @@
     if (!cleanCode) { onFail && onFail('invalid-code'); return {cancel:function(){}}; }
     const roomRef = fs.doc(db, 'rooms', cleanCode);
     let unsub = null, poll = null, timer = null, done = false;
+    let opp = null;
     const stop = function(){
       if (unsub) { try { unsub(); } catch(e) {} unsub = null; }
       if (poll) { clearInterval(poll); poll = null; }
@@ -315,9 +374,14 @@
       if (G.console) console.error('[ML PVP GUEST]', msg, e);
       onFail && onFail(msg);
     };
-    const finish = function(v){
-      if (done) return;
-      done = true; stop(); onFound && onFound(v);
+    const finish = function(v){ if (done) return; done=true; stop(); onFound && onFound(v); };
+    const consume = function(snap){
+      if (done || !snap || !snap.exists()) return;
+      const d = snap.data() || {};
+      if (d.status === 'playing' && (d.guestUid || d.guest) === uid) {
+        if (onState) onState('starting');
+        finish({role:'guest', roomId:cleanCode, opp:opp});
+      }
     };
 
     fs.getDoc(roomRef).then(function(snap){
@@ -326,24 +390,32 @@
       if (d.status !== 'waiting') throw new Error('FULL');
       if (d.host === uid) throw new Error('SELF');
       if (d.guest || d.guestUid) throw new Error('FULL');
-      const opp = { uid:d.host, name:d.hostName || 'HOST', hero:d.hostHero || 'raka', mr:d.hostMr || 1000, gear:d.hostGear || null };
-
-      // CRITICAL: guest itself starts the room. Host is read-only from here.
-      return fs.updateDoc(roomRef, _clean({
-        status:'playing',
+      opp = {uid:d.host, name:d.hostName || 'HOST', hero:d.hostHero || 'raka', mr:d.hostMr || 1000, gear:d.hostGear || null};
+      const guestData = _clean({
         guest:uid, guestUid:uid,
         guestName:(me.name || 'PEMAIN').slice(0,12), guestHero:me.hero || 'raka',
         guestMr:isFinite(me.mr) ? me.mr : 1000, guestGear:me.gear || null,
-        names:{host:d.hostName || 'HOST', guest:(me.name || 'PEMAIN').slice(0,12)},
-        heroes:{host:d.hostHero || 'raka', guest:me.hero || 'raka'},
-        round:0, q:null, ans:null, skillReq:false, surrender:false,
-        seq:0, frame:null, winner:null, result:null,
-        hostAlive:Date.now(), guestAlive:Date.now(), updatedAt:Date.now()
-      })).then(function(){
-        if (onState) onState('starting');
-        // Guest does not wait for host. Both clients now see the same playing document.
-        finish({role:'guest', roomId:roomRef.id, opp:opp});
-      }).catch(function(e){ throw e; });
+        updatedAt:Date.now()
+      });
+      // Write guest presence to the room.
+      return fs.setDoc(roomRef, guestData, {merge:true}).then(function(){
+        // Independent acknowledgement channel owned by host.
+        const hostMM = fs.doc(db, 'matchmaking', d.host);
+        return fs.setDoc(hostMM, _clean({
+          matched:true, opponent:uid,
+          oppName:(me.name || 'PEMAIN').slice(0,12), oppHero:me.hero || 'raka',
+          oppMr:isFinite(me.mr) ? me.mr : 1000, oppGear:me.gear || null,
+          updatedAt:Date.now()
+        }), {merge:true});
+      });
+    }).then(function(){
+      if (done) return;
+      if (onState) onState('claimed');
+      unsub = fs.onSnapshot(roomRef, consume, function(e){
+        if (G.console) console.error('[ML PVP GUEST LISTENER]', e && (e.code || e.message) || e);
+      });
+      poll = setInterval(function(){ fs.getDoc(roomRef).then(consume).catch(function(e){ if(G.console) console.warn('[ML PVP GUEST POLL]', e && (e.code || e.message) || e); }); }, 750);
+      timer = setTimeout(function(){ if(!done){ stop(); onFail && onFail('timeout'); done=true; } }, 60000);
     }).catch(function(e){
       const m = String(e && (e.code || e.message) || e);
       if (/NOT_FOUND|not-found/i.test(m)) fail('notfound');
@@ -351,7 +423,7 @@
       else if (/SELF/i.test(m)) fail('self');
       else fail(m);
     });
-    return { cancel:function(){ if (!done) { done=true; stop(); onFail && onFail('cancel'); } } };
+    return {cancel:function(){ if(!done){done=true; stop(); onFail && onFail('cancel');}}};
   };
 
   /* ================= NET BATTLE ================= */
