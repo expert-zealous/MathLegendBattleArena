@@ -224,7 +224,7 @@
 
   /* HOST: buat ruangan -> cb({role:'host', roomId, opp}) saat lawan bergabung.
      Kode dibuat PEMANGGIL (main.js) agar bisa ditampilkan SEBELUM menulis ke jaringan. */
-  PVP.createRoom = function (fb, me, code, onFound, onFail) {
+  PVP.createRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
     let unsub = null, done = false;
     code = String(code || PVP.makeCode()).toUpperCase();
@@ -239,10 +239,12 @@
       guest: null, guestName: null, guestHero: null, guestMr: null, guestGear: null,
       createdAt: Date.now(), updatedAt: Date.now()
     })).then(function () {
+      if (onState) onState('waiting');
       unsub = fs.onSnapshot(roomRef, function (snap) {
         if (done || !snap.exists()) return;
         const d = snap.data();
         if (d.guest && d.guestUid) {
+          if (onState) onState('joining');
           const opp = { uid: d.guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka', mr: d.guestMr || 1000, gear: d.guestGear || null };
           // ubah ke ruangan pertandingan aktif (format NetBattle)
           fs.setDoc(roomRef, _clean({
@@ -279,7 +281,7 @@
   };
 
   /* GUEST: gabung dengan kode -> cb({role:'guest', roomId, opp}) saat host memulai */
-  PVP.joinRoom = function (fb, me, code, onFound, onFail) {
+  PVP.joinRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = fb.uid;
     const roomRef = fs.doc(db, 'rooms', String(code || '').trim().toUpperCase());
     let unsub = null, done = false;
@@ -297,11 +299,13 @@
       }));
       return { hostName: d.hostName, hostHero: d.hostHero, hostMr: d.hostMr, hostGear: d.hostGear, hostUid: d.host };
     }).then(function (info) {
+      if (onState) onState('claimed');
       const opp = { uid: info.hostUid, name: info.hostName || 'HOST', hero: info.hostHero || 'raka', mr: info.hostMr || 1000, gear: info.hostGear || null };
       unsub = fs.onSnapshot(roomRef, function (snap) {
         if (done || !snap.exists()) return;
         const d = snap.data();
         if (d.status === 'playing' && d.guest === uid) {
+          if (onState) onState('starting');
           done = true; stop();
           onFound({ role: 'guest', roomId: roomRef.id, opp: opp });
         }

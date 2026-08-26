@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "firebase": "^12.18.0",
+    "firebase": "^10.12.2",
     "jsdom": "^29.1.1"
   }
 }

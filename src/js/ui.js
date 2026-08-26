@@ -130,6 +130,12 @@
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     },
 
+    /* perbarui baris status pada modal yang terbuka */
+    setModalStatus: function (text) {
+      const st = U.$('.m-status');
+      if (st) st.textContent = text;
+    },
+
     /* modal input generik (kode ruangan / gabung / wasit) */
     inputModal: function (title, desc, placeholder, btnLabel, cb) {
       const self = this;
@@ -166,6 +172,7 @@
         '<h3 style="margin-top:12px">🎮 Ruangan dibuat!</h3>' +
         '<p>Berikan kode ini kepada lawan:<br>' +
         '<b class="room-code">' + esc(code) + '</b></p>' +
+        '<div class="m-status">⏳ Menunggu lawan bergabung… (jangan tutup layar ini)</div>' +
         '<p class="page-desc small">Lawan: MAIN → 🌐 GABUNG KODE → masuk ' + esc(code) + '.<br>Wasit: 📺 Mode Wasit → kode yang sama.</p>' +
         '<div class="m-actions"><button class="btn ghost" data-mact="cancel">BATAL</button></div>' +
         '</div>'
@@ -214,6 +221,7 @@
         '<div style="text-align:center">' +
         '<div class="spinner"></div>' +
         '<h3 style="margin-top:12px">🔎 Mencari lawan…</h3>' +
+        '<div class="m-status">Menghubungi server…</div>' +
         '<p>Lawan sungguhan dicari lewat Firebase.<br>Biasanya sekejap bila ada pemain lain mencari.</p>' +
         '<div class="m-actions"><button class="btn ghost" data-mact="cancel">BATAL</button></div>' +
         '</div>'
@@ -241,7 +249,7 @@
       el('h-mascot').innerHTML = heroImg(P.heroDef());
       el('h-mr').textContent = pf.mr;
       const net = el('h-net');
-      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8.3 🟢 online' : 'v0.8.3 offline';
+      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8.4 🟢 online' : 'v0.8.4 offline';
     },
 
     /* ================= SETUP ================= */
@@ -434,7 +442,9 @@
       el('pf-topics').innerHTML = '<h3>📈 PENGUASAAN MATERI</h3>' + this.topicBars(pf.perTopic, true);
 
       el('pf-sound').innerHTML = AU.enabled ? '🔊 EFEK SUARA: ON' : '🔇 EFEK SUARA: OFF';
-      el('pf-music').innerHTML = AU.musicEnabled ? '🎵 MUSIK: ON' : '🎵 MUSIK: OFF';
+      const det = AU.filesDetected ? AU.filesDetected() : { ok: 0, total: 0 };
+      el('pf-music').innerHTML = (AU.musicEnabled ? '🎵 MUSIK: ON' : '🎵 MUSIK: OFF') +
+        (det.total ? ' <small>(file terdeteksi ' + det.ok + '/' + det.total + ')</small>' : '');
     },
 
     /* ---------- helper kecil ---------- */

@@ -27,7 +27,7 @@
     'atk-morru': 'assets/audio/atk-morru.mp3'
   };
 
-  const Audio = (ML.Audio = {
+  const AudioSystem = (ML.Audio = {
     ctx: null,
     enabled: true,        // SFX
     musicEnabled: true,   // musik latar
@@ -49,33 +49,57 @@
       return this.ctx;
     },
 
-    /* ---------- probe ketersediaan file (aman, tanpa log error) ---------- */
+    /* ---------- probe ketersediaan file ---------- */
     probeFiles: function () {
       const self = this;
       const all = Object.assign({}, MUSIC_FILES, SFX_FILES);
       Object.keys(all).forEach(function (name) {
         try {
-          const a = new Audio(all[name]);
+          const a = new window.Audio();
           a.preload = 'metadata';
           a.addEventListener('loadedmetadata', function () { self._files[name] = true; });
+          a.addEventListener('canplaythrough', function () { self._files[name] = true; });
           a.addEventListener('error', function () { self._files[name] = false; });
-          self._files[name] = self._files[name] || null; // null = belum diketahui
+          self._files[name] = null;
+          a.src = all[name];
+          try { a.load(); } catch (e) {}
         } catch (e) { self._files[name] = false; }
       });
     },
     fileReady: function (name) { return this._files[name] === true; },
+    filesDetected: function () {
+      const names = Object.keys(this._files);
+      return { ok: names.filter(n => this._files[n] === true).length, total: names.length, names: names.filter(n => this._files[n] === true) };
+    },
 
     _playFile: function (name, vol, loop) {
       const url = (MUSIC_FILES[name] || SFX_FILES[name]);
-      if (!url || !this.fileReady(name)) return false;
+      if (!url || typeof window === 'undefined') return false;
       try {
-        const el = new Audio(url);
+        // Jangan menunggu probeFiles(). Audio harus langsung dicoba saat
+        // dipanggil dari klik/tap user; probe sebelumnya bersifat asynchronous.
+        const el = new window.Audio();
+        el.preload = 'auto';
+        el.src = url;
         el.loop = !!loop;
         el.volume = vol != null ? vol : 0.5;
+        el.addEventListener('canplaythrough', function () {
+          this._files[name] = true;
+        }.bind(this), { once: true });
+        el.addEventListener('error', function () {
+          this._files[name] = false;
+        }.bind(this), { once: true });
         const p = el.play();
-        if (p && p.catch) p.catch(function () {});
+        if (p && p.catch) {
+          p.catch(function () {
+            // Autoplay policy dapat menolak play(); jangan buang element.
+            // Panggilan berikutnya dari gesture user akan mencoba lagi.
+          });
+        }
         return el;
-      } catch (e) { return null; }
+      } catch (e) {
+        return null;
+      }
     },
 
     /* ---------- musik latar ---------- */
@@ -84,7 +108,7 @@
       if (this._currentTrack === track && this._musicEl) return;
       this.musicStop();
       this._currentTrack = track;
-      // file milikmu bila ada; bila belum: tetap hening (SFX sintesis tetap hidup)
+      // Coba file secara langsung; jangan menunggu probe asynchronous.
       const el = this._playFile(track, 0.32, true);
       this._musicEl = el || { pause: function () {} }; // stub agar aman bila Audio tak tersedia
       if (!el) this._currentTrack = null;

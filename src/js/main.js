@@ -188,6 +188,12 @@
               UI.closeModal();
               UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' :
                        err === 'cancel' ? 'ℹ️ Dibatalkan' : '⚠️ Buat ruangan: ' + String(err).slice(0, 90));
+            },
+            function (st) {
+              if (st === 'joining') {
+                AU.play('rankup');
+                UI.setModalStatus('✅ Lawan masuk! Memulai pertandingan…');
+              }
             });
         } catch (e) {
           UI.closeModal();
@@ -210,6 +216,10 @@
               UI.toast(err === 'full' ? '⚠️ Ruangan sudah penuh' :
                        err === 'notfound' ? '⚠️ Kode tidak ditemukan' :
                        err === 'timeout' ? '⌛ Host tidak merespons' : 'ℹ️ Dibatalkan');
+            },
+            function (st) {
+              if (st === 'claimed') { AU.play('skill'); UI.setModalStatus('✅ Terhubung ke ruangan! Menunggu host memulai…'); }
+              else if (st === 'starting') UI.setModalStatus('⚔️ Memulai pertandingan…');
             });
         });
         break;

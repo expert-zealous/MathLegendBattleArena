@@ -5,6 +5,19 @@ Cara paling simpel untuk GitHub Pages: ganti 1 file `index.html` (hasil build su
 
 ---
 
+## v0.8.4 — Indikator Status Koneksi PvP + Diagnosis Audio
+
+**Konteks:** uji tuntas kode-ruangan **sampai battle penuh** ke Firebase pengguna terbukti bekerja (pasangan 2 dtk → 6 ronde → hasil cermin) — Rules Firestore pengguna **valid**, bukan penyebab kegagalan.
+
+**Fitur diagnosis baru:**
+- 📡 **Status koneksi live** di modal PvP: host melihat "⏳ Menunggu lawan…" → "✅ Lawan masuk! Memulai…" (dengan bunyi), guest melihat "✅ Terhubung ke ruangan! Menunggu host memulai…" → "⚔️ Memulai pertandingan…" — titik macet kini terlihat jelas
+- 🎵 **Diagnosis audio**: tombol MUSIK di PROFIL menampilkan jumlah file terdeteksi (mis. "file terdeteksi 2/9") — memastikan file musik/SFX milikmu benar terbaca
+- Uji baru: `test/firebase-room-battle-e2e.js` (battle penuh via kode ruangan)
+
+**File berubah:** `index.html` 🔁 · `src/js/pvp.js` (onState) · `src/js/main.js` · `src/js/ui.js` · `src/js/audio.js` (filesDetected) · `src/css/style.css` · versi 0.8.4
+
+---
+
 ## v0.8.3 — FIX "invalid-argument" saat buat ruangan + Update GitHub tidak mau maju
 
 **Perbaikan (laporan pemain):**
