@@ -5,6 +5,24 @@ Cara paling simpel untuk GitHub Pages: ganti 1 file `index.html` (hasil build su
 
 ---
 
+## v0.8.3 — FIX "invalid-argument" saat buat ruangan + Update GitHub tidak mau maju
+
+**Perbaikan (laporan pemain):**
+- 🐛 **"Gagal membuat ruangan: invalid-argument"** di server lokal — Firestore menolak nilai `undefined`/`NaN`. Kini SEMUA tulisan PvP (ruangan, lobby, profil, klaim) melewati **sanitasi otomatis** (`_clean`): nilai hancur diubah aman, nama dipotong 12 kar. Teruji dengan profil sengaja dirusak → sukses tersimpan ✅
+- 🐛 **Upload GitHub "selalu file lama"** — dua lapis perbaikan:
+  1. Service worker kini **memuat ulang tab terbuka** begitu versi baru aktif (`clients.navigate`), cache lama dihapus otomatis, dan halaman selalu *network-first* — setelah migrasi sekali, semua update berlaku otomatis
+  2. Panduan migrasi sekali (lihat bawah)
+- 🐛 Perbaikan internal: urutan deklarasi sanitizer (pvp.js sempat gagal dimuat)
+
+**Migrasi sekali setelah deploy v0.8.3** (untuk perangkat yang pernah membuka versi lama):
+1. Cara termudah: buka alamat game dengan tambahan `?v=83` (mis. `https://user.github.io/repo/?v=83`) — cache lama otomatis dilewati, lalu halaman normal kembali
+2. Atau: Ctrl+Shift+R (hard refresh) sekali, atau pengaturan browser → hapus data situs
+3. Cek juga GitHub Pages: Settings → Pages — branch & folder yang dituju harus sesuai tempat file di-upload
+
+**File berubah:** `index.html` 🔁 · `src/js/pvp.js` (sanitasi semua tulisan) · `src/js/main.js` (pesan galat lengkap) · `src/js/data.js`, `src/js/ui.js`, `src/index.html` (versi 0.8.3) · `build.py` (SW auto-reload tab) · `CHANGELOG.md`
+
+---
+
 ## v0.8.2 — FIX Kode Ruangan Tidak Muncul (hanya titik-titik) + Service Worker Tidak Memuat Versi Baru
 
 **Perbaikan (laporan pemain):**

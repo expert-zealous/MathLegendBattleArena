@@ -21,6 +21,24 @@
   const HB_MS = 5000;      // interval heartbeat
   const HB_STALE = 20000;  // dianggap putus
 
+  /* ---------- sanitasi payload utk Firestore ----------
+     Firestore menolak nilai undefined/NaN (kode: invalid-argument).
+     Semua tulisan PvP melewati _clean() agar aman dari profil lama/rusak. */
+  function _clean(obj) {
+    const out = {};
+    Object.keys(obj || {}).forEach(function (k) {
+      let v = obj[k];
+      if (v === undefined || v === null) { out[k] = null; return; }
+      const t = typeof v;
+      if (t === 'number') { out[k] = isFinite(v) ? v : 0; return; }
+      if (t === 'string') { out[k] = v.slice(0, 40); return; }
+      if (t === 'boolean') { out[k] = v; return; }
+      if (t === 'object' && !Array.isArray(v)) { out[k] = _clean(v); return; }
+      out[k] = String(v).slice(0, 40);
+    });
+    return out;
+  }
+
   /* ================= MATCHMAKING =================
      Lobby satu dokumen (rooms/lobby): antrean uid. Transaksi Firestore pada
      SATU dokumen terserialisasi penuh -> tak ada race dua-HOST.
@@ -46,7 +64,7 @@
             const snap = await tx.get(lobbyRef);
             const q = (snap.exists() && snap.data().queue) ? snap.data().queue.slice() : [];
             const i = q.indexOf(uid);
-            if (i >= 0) { q.splice(i, 1); tx.set(lobbyRef, { queue: q, updatedAt: Date.now() }); }
+            if (i >= 0) { q.splice(i, 1); tx.set(lobbyRef, _clean({ queue: q, updatedAt: Date.now() })); }
           }).catch(function () {});
         } catch (e) {}
       };
@@ -58,10 +76,11 @@
       const run = async function () {
         // profil saya utk dibaca lawan
         try {
-          await fs.setDoc(myRef, {
-            uid: uid, name: me.name, hero: me.hero, mr: me.mr || 1000,
-            gear: me.gear || null, matched: false, opponent: null, updatedAt: Date.now()
-          });
+          await fs.setDoc(myRef, _clean({
+            uid: uid, name: (me.name || 'PEMAIN').slice(0, 12), hero: me.hero || 'raka',
+            mr: isFinite(me.mr) ? me.mr : 1000, gear: me.gear || null,
+            matched: false, opponent: null, updatedAt: Date.now()
+          }));
         } catch (e) { /* abaikan: dok lama tak masalah */ }
 
         for (let attempt = 0; attempt < 14 && !done && !cancelled; attempt++) {
@@ -73,7 +92,7 @@
               const myIdx = q.indexOf(uid);
               if (myIdx === 0 || (myIdx < 0 && q.length === 0) || (myIdx < 0 && q[0] === uid)) {
                 // hanyaorang pertama boleh mengantre sbg HOST kandidat
-                if (myIdx < 0) { q.push(uid); tx.set(lobbyRef, { queue: q, updatedAt: Date.now() }); }
+                if (myIdx < 0) { q.push(uid); tx.set(lobbyRef, _clean({ queue: q, updatedAt: Date.now() })); }
                 return { role: 'host-wait' };
               }
               if (myIdx > 0) {
@@ -86,10 +105,10 @@
               const candSnap = await tx.get(fs.doc(db, 'matchmaking', hostUid));
               const fresh = candSnap.exists() && (Date.now() - (candSnap.data().updatedAt || 0) < 120000);
               if (!fresh) {
-                tx.set(lobbyRef, { queue: q, updatedAt: Date.now() });
+                tx.set(lobbyRef, _clean({ queue: q, updatedAt: Date.now() }));
                 return { role: 'retry' };
               }
-              tx.set(lobbyRef, { queue: q, updatedAt: Date.now() });
+              tx.set(lobbyRef, _clean({ queue: q, updatedAt: Date.now() }));
               return { role: 'guest', hostUid: hostUid };
             });
           } catch (e) {
@@ -103,10 +122,11 @@
             // kunci dokumen host dengan identitasku
             const hostRef = fs.doc(db, 'matchmaking', res.hostUid);
             try {
-              await fs.updateDoc(hostRef, {
+              await fs.updateDoc(hostRef, _clean({
                 matched: true, opponent: uid,
-                oppName: me.name, oppHero: me.hero, oppMr: me.mr || 1000, oppGear: me.gear || null
-              });
+                oppName: (me.name || 'PEMAIN').slice(0, 12), oppHero: me.hero || 'raka',
+                oppMr: isFinite(me.mr) ? me.mr : 1000, oppGear: me.gear || null
+              }));
             } catch (e) { await sleep(400); continue; }
             const hostSnap = await fs.getDoc(hostRef).catch(function () { return null; });
             const hd = hostSnap && hostSnap.exists() ? hostSnap.data() : null;
@@ -154,14 +174,14 @@
                 opp.name = gd.name || opp.name; opp.hero = gd.hero || opp.hero; opp.mr = gd.mr || opp.mr; opp.gear = gd.gear || opp.gear;
               }
               try {
-                await fs.setDoc(fs.doc(db, 'rooms', uid), {
+                await fs.setDoc(fs.doc(db, 'rooms', uid), _clean({
                   status: 'playing', host: uid, guest: opp.uid,
                   names: { host: me.name, guest: opp.name },
                   heroes: { host: me.hero, guest: opp.hero },
                   round: 0, q: null, ans: null, skillReq: false, surrender: false,
                   seq: 0, frame: null, winner: null, result: null,
                   hostAlive: Date.now(), guestAlive: Date.now(), updatedAt: Date.now()
-                });
+                }));
               } catch (e) { await sleep(400); continue; }
               leaveQueue();
               clearTimeout(timer);
@@ -213,26 +233,26 @@
     const stop = function () { if (unsub) { try { unsub(); } catch (e) {} } };
     const finish = function (v) { if (done) return; done = true; stop(); if (v) onFound(v); else onFail && onFail('cancel'); };
 
-    fs.setDoc(roomRef, {
-      status: 'waiting', host: uid, hostName: me.name, hostHero: me.hero,
-      hostMr: me.mr || 1000, hostGear: me.gear || null,
+    fs.setDoc(roomRef, _clean({
+      status: 'waiting', host: uid, hostName: (me.name || 'PEMAIN').slice(0, 12),
+      hostHero: me.hero || 'raka', hostMr: isFinite(me.mr) ? me.mr : 1000, hostGear: me.gear || null,
       guest: null, guestName: null, guestHero: null, guestMr: null, guestGear: null,
       createdAt: Date.now(), updatedAt: Date.now()
-    }).then(function () {
+    })).then(function () {
       unsub = fs.onSnapshot(roomRef, function (snap) {
         if (done || !snap.exists()) return;
         const d = snap.data();
         if (d.guest && d.guestUid) {
           const opp = { uid: d.guestUid, name: d.guestName || 'GUEST', hero: d.guestHero || 'raka', mr: d.guestMr || 1000, gear: d.guestGear || null };
           // ubah ke ruangan pertandingan aktif (format NetBattle)
-          fs.setDoc(roomRef, {
+          fs.setDoc(roomRef, _clean({
             status: 'playing', host: uid, guest: opp.uid,
             names: { host: me.name, guest: opp.name },
             heroes: { host: me.hero, guest: opp.hero },
             round: 0, q: null, ans: null, skillReq: false, surrender: false,
             seq: 0, frame: null, winner: null, result: null,
             hostAlive: Date.now(), guestAlive: Date.now(), updatedAt: Date.now()
-          }).then(function () {
+          })).then(function () {
             finish({ role: 'host', roomId: code, opp: opp });
           }).catch(function (e) { if (!done) { done = true; stop(); onFail && onFail(String(e && e.code || e)); } });
         }
@@ -270,10 +290,11 @@
       if (!snap.exists()) throw new Error('NOT_FOUND');
       const d = snap.data();
       if (d.status !== 'waiting' || d.guest) throw new Error('FULL');
-      tx.update(roomRef, {
-        guest: uid, guestUid: uid, guestName: me.name, guestHero: me.hero,
-        guestMr: me.mr || 1000, guestGear: me.gear || null, updatedAt: Date.now()
-      });
+      tx.update(roomRef, _clean({
+        guest: uid, guestUid: uid, guestName: (me.name || 'PEMAIN').slice(0, 12),
+        guestHero: me.hero || 'raka', guestMr: isFinite(me.mr) ? me.mr : 1000,
+        guestGear: me.gear || null, updatedAt: Date.now()
+      }));
       return { hostName: d.hostName, hostHero: d.hostHero, hostMr: d.hostMr, hostGear: d.hostGear, hostUid: d.host };
     }).then(function (info) {
       const opp = { uid: info.hostUid, name: info.hostName || 'HOST', hero: info.hostHero || 'raka', mr: info.hostMr || 1000, gear: info.hostGear || null };

@@ -187,7 +187,7 @@
             function (err) {
               UI.closeModal();
               UI.toast(err === 'timeout' ? '⌛ Tak ada lawan dalam 3 menit' :
-                       err === 'cancel' ? 'ℹ️ Dibatalkan' : '⚠️ ' + String(err).slice(0, 60));
+                       err === 'cancel' ? 'ℹ️ Dibatalkan' : '⚠️ Buat ruangan: ' + String(err).slice(0, 90));
             });
         } catch (e) {
           UI.closeModal();
