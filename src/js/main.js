@@ -215,7 +215,10 @@
               UI.closeModal();
               UI.toast(err === 'full' ? '⚠️ Ruangan sudah penuh' :
                        err === 'notfound' ? '⚠️ Kode tidak ditemukan' :
-                       err === 'timeout' ? '⌛ Host tidak merespons' : 'ℹ️ Dibatalkan');
+                       err === 'self' ? '⚠️ Tidak bisa bergabung ke room sendiri' :
+                       err === 'timeout' ? '⌛ Host tidak merespons' :
+                       /permission-denied/i.test(String(err)) ? '🔒 Firebase menolak akses ke room. Cek Firestore Rules.' :
+                       '⚠️ Gagal bergabung: ' + String(err).slice(0, 100));
             },
             function (st) {
               if (st === 'claimed') { AU.play('skill'); UI.setModalStatus('✅ Terhubung ke ruangan! Menunggu host memulai…'); }

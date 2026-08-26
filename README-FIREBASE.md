@@ -89,3 +89,11 @@ service cloud.firestore {
 - **Kuota gratis** Spark: 50rb baca/20rb tulis Firestore per hari — cukup untuk satu kelas/sekolah kecil. Cloud save hanya mengirim profil saat selesai match.
 - **Anti-cheat (versi kompetitif nanti)**: nilai client bisa dimanipulasi. Solusi: pindahkan `battle.js` ke Cloud Functions — kirim hanya *keputusan jawaban + waktu*, biarkan server menghitung damage/XP (arsitektur engine sudah bebas DOM, siap dipindah).
 - **Menghapus data pemain**: Console → Firestore → hapus dokumen `players/{uid}` & `leaderboard/{uid}`.
+
+
+## PENTING — UJI KODE ROOM v0.9
+Versi ini memakai `getDoc + updateDoc` untuk klaim slot guest, bukan transaksi,
+agar error akses Firestore dapat dibedakan dengan jelas. Jika tombol GABUNG
+menampilkan `Firebase menolak akses ke room`, Rules Firestore Anda belum sesuai.
+Gunakan `firestore.rules` yang disertakan dalam paket ini dan Publish di Firebase
+Console > Firestore Database > Rules. Setelah itu reload kedua perangkat.
