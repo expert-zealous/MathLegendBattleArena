@@ -47,6 +47,8 @@ const CFG = {
   console.log('✅ 2 klien anonim terautentikasi:', host.uid.slice(0, 6), '/', guest.uid.slice(0, 6));
 
   /* --- 1. MATCHMAKING --- */
+  // bersihkan lobby dari uji-uji sebelumnya
+  try { await fsMod.deleteDoc(fsMod.doc(host.fb.db, 'rooms', 'lobby')); } catch (e) {}
   console.log('\n🔎 matchmaking…');
   const t0 = Date.now();
   const found = await new Promise((resolve, reject) => {
@@ -59,12 +61,12 @@ const CFG = {
     }
   });
   const { hInfo, gInfo } = found;
-  assert.strictEqual(hInfo.role, 'host', 'pembuat antrean pertama = host');
-  assert.strictEqual(gInfo.role, 'guest', 'penggabung = guest');
+  // peran ditentukan urutan commit lobby (bukan urutan panggilan) — keduanya sah
+  assert.ok(hInfo.role !== gInfo.role, 'tepat satu host & satu guest');
   assert.strictEqual(hInfo.roomId, gInfo.roomId, 'kedua pihak satu ruangan');
-  assert.strictEqual(hInfo.opp.name, 'GUEST-UJI', 'host melihat nama guest');
-  assert.strictEqual(gInfo.opp.name, 'HOST-UJI', 'guest melihat nama host');
-  console.log(`✅ terpasangkan dalam ${Date.now() - t0}ms — room ${hInfo.roomId.slice(0, 6)}…`);
+  assert.strictEqual(hInfo.opp.name, 'GUEST-UJI', 'klien HOST-UJI melihat nama lawan');
+  assert.strictEqual(gInfo.opp.name, 'HOST-UJI', 'klien GUEST-UJI melihat nama lawan');
+  console.log(`✅ terpasangkan dalam ${Date.now() - t0}ms — room ${hInfo.roomId.slice(0, 6)}… (peran: HOST-UJI=${hInfo.role})`);
 
   /* --- 2. BATTLE PENUH lewat Firestore --- */
   console.log('\n⚔️ battle PvP dimulai (auto-answer kedua pihak)…');
@@ -77,19 +79,19 @@ const CFG = {
 
   // auto-answer
   netHost.on('question', d => setTimeout(() => netHost.playerAnswer(d.q.answerIndex), 300));
-  netGuest.on('question', d => setTimeout(() => netGuest.playerAnswer(Math.random() < 0.75 ? d.q.answerIndex : (d.q.answerIndex + 1) % 4), 300 + Math.random() * 2500));
+  netGuest.on('question', d => setTimeout(() => netGuest.playerAnswer(Math.random() < 0.75 ? d.q.answerIndex : (d.q.answerIndex + 1) % 4), 250));
 
   netHost.start();
   netGuest.start();
 
   const t1 = Date.now();
-  while ((!hostRes || !guestRes) && Date.now() - t1 < 150000) await sleep(400);
+  while ((!hostRes || !guestRes) && Date.now() - t1 < 300000) await sleep(400);
   assert.ok(hostRes && guestRes, 'kedua pihak menerima hasil (host=' + !!hostRes + ', guest=' + !!guestRes + ')');
   assert.strictEqual(hostRes.win, !guestRes.win, 'hasil saling bercermin');
   assert.strictEqual(hostRes.oppName, 'GUEST-UJI', 'host vs GUEST-UJI');
   assert.strictEqual(guestRes.oppName, 'HOST-UJI', 'guest vs HOST-UJI');
   assert.ok(hostRes.questions >= 1 && guestRes.questions >= 1, 'soal terjawab kedua sisi');
-  assert.strictEqual(hostRes.questions, guestRes.questions, 'jumlah ronde sama');
+  assert.ok(Math.abs(hostRes.questions - guestRes.questions) <= 1, 'ronde kedua sisi sama (±1 utk KO)');
   console.log(`✅ battle selesai ${hostRes.rounds} ronde — HOST ${hostRes.win ? 'MENANG' : 'KALAH'} vs GUEST ${guestRes.win ? 'MENANG' : 'KALAH'}`);
   console.log('   host: acc ' + Math.round(hostRes.accuracy * 100) + '%, dmg ' + hostRes.dmgDealt + ' | guest: acc ' + Math.round(guestRes.accuracy * 100) + '%, dmg ' + guestRes.dmgDealt);
 
@@ -99,8 +101,10 @@ const CFG = {
   /* --- 3. BERSIHKAN --- */
   console.log('\n🧹 membersihkan dokumen uji…');
   const del = fsMod.deleteDoc(fsMod.doc(host.fb.db, 'rooms', hInfo.roomId)).catch(e => console.log('   room:', e.message));
+  const delLobby = fsMod.deleteDoc(fsMod.doc(host.fb.db, 'rooms', 'lobby')).catch(() => {});
   await Promise.all([
     del,
+    delLobby,
     fsMod.deleteDoc(fsMod.doc(host.fb.db, 'matchmaking', host.uid)).catch(() => {}),
     fsMod.deleteDoc(fsMod.doc(guest.fb.db, 'matchmaking', guest.uid)).catch(() => {})
   ]);

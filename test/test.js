@@ -65,10 +65,11 @@ D.topics.forEach(t => {
   }
 });
 
-test('tidak mengulang soal dalam satu match (18 ronde)', () => {
+test('tidak mengulang soal dalam satu match (MAX_ROUNDS ronde)', () => {
   const used = new Set();
   const texts = [];
-  for (let i = 0; i < 18; i++) {
+  const NR = R.MAX_ROUNDS;
+  for (let i = 0; i < NR; i++) {
     const q = QEngine.make(U.pick(QEngine.topics()), U.ri(1, 5), used);
     texts.push(q.text);
   }
@@ -300,12 +301,12 @@ async function simulate(n, accP, label) {
         battle.start();
         drain(15 * 60 * 1000).catch(reject);
       });
-      assert.ok(result.questions >= 1 && result.questions <= 18, 'ronde dalam batas: ' + result.questions);
+      assert.ok(result.questions >= 1 && result.questions <= R.MAX_ROUNDS, 'ronde dalam batas: ' + result.questions);
       assert.ok(Number.isFinite(result.hpP) && Number.isFinite(result.hpE), 'HP finite');
       assert.ok(result.hpP >= 0 && result.hpE >= 0, 'HP tidak negatif');
       assert.ok(result.accuracy >= 0 && result.accuracy <= 1);
       assert.ok(result.maxCombo >= 0);
-      if (result.win) assert.ok(result.hpE === 0 || result.rounds === 18, 'syarat menang benar');
+      if (result.win) assert.ok(result.hpE === 0 || result.rounds === R.MAX_ROUNDS, 'syarat menang benar');
       battle.destroy();
     }
   } catch (e) { ok = false; msg = e.message; }
@@ -527,6 +528,63 @@ async function simulate(n, accP, label) {
     assert.ok(b2.p.hp >= 0 && b2.p.hp <= b2.p.maxHp, 'HP necro dalam rentang (heal ter-cap)');
     b2.destroy();
     assert.ok(true, 'shadow queued=' + queued + ', sawShadow=' + sawShadow);
+  });
+
+  /* ================= 6. TOKO ATRIBUT ================= */
+  console.log('\n[6] Toko atribut (gear)');
+  test('computeGear & buyGear: bonus benar & saldo terpotong', () => {
+    const P = ML.Player;
+    P.data = null; P.load();
+    P.data.coins = 1000; P.data.diamonds = 10; P.data.gear = {};
+    assert.deepStrictEqual ? null : null;
+    // level 0: tanpa bonus
+    let g = P.computeGear();
+    assert.ok(g.hpMul === 0 && g.atkMul === 0 && g.critAdd === 0 && g.defAdd === 0);
+    // beli Jantung Titan 2x: +12% HP
+    assert.ok(P.buyGear('heart').ok);
+    assert.ok(P.buyGear('heart').ok);
+    assert.strictEqual(P.data.coins, 1000 - 40 - 80);
+    g = P.computeGear();
+    assert.ok(Math.abs(g.hpMul - 0.12) < 1e-9, 'hpMul 0.12');
+    assert.strictEqual(P.gearLevel('heart'), 2);
+    // harga naik & tolak bila saldo kurang
+    P.data.coins = 0;
+    assert.strictEqual(P.buyGear('heart').ok, false);
+    // tier diamond: Jimat Kritis lv4 butuh gem
+    P.data.coins = 10000; P.data.gear.charm = 3;
+    assert.ok(P.buyGear('charm').ok);
+    assert.strictEqual(P.data.diamonds, 10 - 5);
+    // maksimal
+    P.data.coins = 99999; P.data.gear.aegis = 3;
+    assert.strictEqual(P.nextGearCost('aegis'), null);
+    assert.strictEqual(P.buyGear('aegis').ok, false);
+  });
+
+  test('battle: gear menambah HP/ATK/DEF/crit', async () => {
+    const b0 = new Battle({ heroId: 'raka', aiHeroId: 'lyra', aiLevelIdx: 1, practice: false, playerName: 'A' });
+    const baseHp = b0.p.maxHp, baseAtk = b0.p.hero.atk;
+    b0.destroy();
+    const b = new Battle({
+      heroId: 'raka', aiHeroId: 'lyra', aiLevelIdx: 1, practice: false, playerName: 'A',
+      playerGear: { hpMul: 0.2, atkMul: 0.1, critAdd: 0.05, defAdd: 2 }
+    });
+    assert.strictEqual(b.p.maxHp, Math.round(baseHp * 1.2), 'HP +20%');
+    assert.strictEqual(b.p.atk, Math.round(baseAtk * 1.1), 'ATK fighter +10%');
+    assert.strictEqual(b.p.def, D.heroes[0].def + 2, 'DEF +2');
+    assert.strictEqual(b.p.gearCrit, 0.05);
+    b.destroy();
+    assert.ok(true);
+  });
+
+  test('bonus koin naik seiring level pemain', () => {
+    const P = ML.Player;
+    P.data = null; P.load();
+    P.data.xp = 1000; P.data.coins = 0; // level ~4-5
+    const lv = R.levelFromXP(P.data.xp).level;
+    const before = P.data.coins;
+    P.applyMatchResult({ win: true, draw: false, practice: false, aiLevelIdx: 1, questions: 8, correct: 8, perfect: 4, hardCorrect: 1, accuracy: 1, maxCombo: 8, perTopic: {}, wrongList: [], comeback: 0, dmgDealt: 0, dmgTaken: 0 });
+    const gained = P.data.coins - before;
+    assert.ok(gained >= 35 + (lv - 1) * 2, 'koin termasuk bonus level: +' + gained);
   });
 
   /* ================= RINGKASAN ================= */

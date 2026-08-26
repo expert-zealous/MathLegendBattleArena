@@ -23,6 +23,7 @@
         hardCorrect: 0, bestCombo: 0, comebacks: 0
       },
       perTopic: {},          // lifetime { topic: {c,t} }
+      gear: {},              // level atribut toko { itemId: level }
       achievements: {},      // id -> {d:timestamp}
       missions: { date: '', items: {} },
       settings: { sound: true }
@@ -75,6 +76,39 @@
       });
     },
 
+    /* ---------- atribut toko ---------- */
+    gearLevel: function (id) { return (this.data.gear && this.data.gear[id]) || 0; },
+    computeGear: function () {
+      const out = { hpMul: 0, atkMul: 0, critAdd: 0, defAdd: 0 };
+      ML.DATA.gear.forEach(function (it) {
+        const lv = ML.Player.gearLevel(it.id);
+        if (lv <= 0) return;
+        const total = it.per * lv;
+        if (it.stat === 'hp') out.hpMul += total;
+        else if (it.stat === 'atk') out.atkMul += total;
+        else if (it.stat === 'crit') out.critAdd += total;
+        else if (it.stat === 'def') out.defAdd += total;
+      });
+      return out;
+    },
+    nextGearCost: function (id) {
+      const it = ML.DATA.gear.find(function (x) { return x.id === id; });
+      const lv = this.gearLevel(id);
+      if (!it || lv >= it.max) return null;
+      return it.costs[lv];
+    },
+    buyGear: function (id) {
+      const cost = this.nextGearCost(id);
+      if (!cost) return { ok: false, msg: 'Sudah level maksimal' };
+      if (cost.coin && this.data.coins < cost.coin) return { ok: false, msg: 'Koin belum cukup' };
+      if (cost.gem && this.data.diamonds < cost.gem) return { ok: false, msg: 'Diamond belum cukup' };
+      if (cost.coin) this.data.coins -= cost.coin;
+      if (cost.gem) this.data.diamonds -= cost.gem;
+      this.data.gear[id] = this.gearLevel(id) + 1;
+      this.save();
+      return { ok: true, msg: 'Atribut naik level!' };
+    },
+
     heroDef: function () {
       const id = this.data.hero;
       return ML.DATA.heroes.find(function (h) { return h.id === id; }) || ML.DATA.heroes[0];
@@ -99,6 +133,8 @@
         mrD = R.elo(pf.mr, oppRating, res.win ? 1 : (res.draw ? 0.5 : 0));
       }
 
+      const lvBonus = (before.level - 1) * 2; // makin tinggi level, makin banyak koin
+      rew.coins += lvBonus;
       pf.xp += xpCalc.total;
       pf.coins += rew.coins;
       pf.diamonds += rew.diamonds;
@@ -159,7 +195,7 @@
 
       return {
         xpParts: xpCalc.parts, xpTotal: xpCalc.total, xpScaled: xpCalc.scaled,
-        coins: rew.coins, diamonds: rew.diamonds,
+        coins: rew.coins, diamonds: rew.diamonds, levelBonus: lvBonus,
         rpDelta: res.practice ? 0 : rpD,
         mrDelta: mrD,
         levelUp: after.level > before.level,

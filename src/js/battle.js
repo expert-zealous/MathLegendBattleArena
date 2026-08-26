@@ -25,8 +25,8 @@
       const heroes = ML.DATA.heroes;
       const byId = {};
       heroes.forEach(function (h) { byId[h.id] = h; });
-      this.p = this._fighter(byId[cfg.heroId] || heroes[0], true);
-      this.e = this._fighter(byId[cfg.aiHeroId] || heroes[U.ri(0, heroes.length - 1)], false);
+      this.p = this._fighter(byId[cfg.heroId] || heroes[0], true, cfg.playerGear);
+      this.e = this._fighter(byId[cfg.aiHeroId] || heroes[U.ri(0, heroes.length - 1)], false, cfg.enemyGear);
       this.ai = new ML.AI(this.e.hero, ML.DATA.aiLevels[cfg.aiLevelIdx != null ? cfg.aiLevelIdx : 1]);
       this.round = 0;
       this.maxRounds = R.MAX_ROUNDS;
@@ -40,10 +40,15 @@
       this._timers = [];
     }
 
-    _fighter(hero, isPlayer) {
+    _fighter(hero, isPlayer, gear) {
+      const g = gear || {};
+      const hp = Math.round(hero.hp * (1 + (g.hpMul || 0)));
       return {
         hero: hero, isPlayer: isPlayer,
-        hp: hero.hp, maxHp: hero.hp,
+        gearCrit: g.critAdd || 0,
+        hp: hp, maxHp: hp,
+        atk: Math.round(hero.atk * (1 + (g.atkMul || 0))),
+        def: hero.def + (g.defAdd || 0),
         energy: ML.Rules.START_ENERGY, combo: 0,
         shield: 0, comebackShield: false, comebackUsed: false,
         empowered: null, // skill "siap tempel": 'meteor' | 'shadow' | 'drain'
@@ -248,7 +253,8 @@
 
     /* ---------- damage engine ---------- */
     _attack(att, def, grade, q, source) {
-      let dmg = att.hero.atk * (1 + 0.12 * (q.difficulty - 1));
+      const atkVal = att.atk != null ? att.atk : att.hero.atk;
+      let dmg = atkVal * (1 + 0.12 * (q.difficulty - 1));
       const tags = [];
       if (grade === 'PERFECT') { dmg *= 1.3; tags.push('⚡ PERFECT'); }
       else if (grade === 'WEAK') { dmg *= 0.6; tags.push('💤 WEAK'); }
@@ -293,6 +299,7 @@
       if (q.difficulty >= 4 && grade === 'PERFECT') cc += 0.08;
       if (att.hero.id === 'lyra') cc += 0.12; // pasif Mage
       if (att.hero.id === 'kage') cc += 0.15; // pasif Ninja
+      if (att.gearCrit) cc += att.gearCrit; // atribut toko
       if (ignoreDef) { crit = true; dmg *= 1.5; tags.push('💥 CRITICAL'); }
       else if (grade !== 'WEAK' && Math.random() < Math.min(cc, 0.55)) {
         crit = true;
@@ -302,7 +309,8 @@
 
       let final = Math.round(dmg);
       if (!ignoreDef) {
-        final -= def.hero.def;
+        const defVal = def.def != null ? def.def : def.hero.def;
+        final -= defVal;
         if (def.hero.id === 'raka') final = Math.round(final * 0.85); // pasif Knight
         if (def.shield > 0) { final = Math.round(final * 0.4); def.shield--; }
         else if (def.comebackShield) { final = Math.round(final * 0.5); def.comebackShield = false; }
@@ -360,7 +368,7 @@
     }
 
     _skillAttack(att, def) { // Hujan Panah: menembus DEF
-      let final = Math.max(1, Math.round(att.hero.atk * 1.3));
+      let final = Math.max(1, Math.round((att.atk != null ? att.atk : att.hero.atk) * 1.3));
       if (def.shield > 0) { final = Math.round(final * 0.4); def.shield--; }
       else if (def.comebackShield) { final = Math.round(final * 0.5); def.comebackShield = false; }
       if (def.hero.id === 'raka') final = Math.round(final * 0.85);

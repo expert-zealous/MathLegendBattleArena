@@ -21,7 +21,7 @@
     PERFECT_PCT: 0.3,  // benar ≤ 30% waktu = PERFECT (d1: 3.0s … d5: 8.4s)
     WEAK_PCT: 0.8,     // benar ≥ 80% waktu = WEAK HIT
     Q_TIME: 10,        // fallback (soal tanpa kesulitan)
-    MAX_ROUNDS: 18,    // batas ronde; sisa HP menentukan pemenang
+    MAX_ROUNDS: 20,    // batas ronde; sisa HP menentukan pemenang
     MAX_ENERGY: 10,
     START_ENERGY: 2,   // modal awal agar strategi skill terbuka lebih cepat
 

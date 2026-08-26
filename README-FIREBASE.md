@@ -67,6 +67,7 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create, update: if request.auth != null
         && request.resource.data.keys().size() <= 30;
+      allow delete: if request.auth != null; // opsional: kebersihan ruangan lama
     }
   }
 }

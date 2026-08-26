@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -17,7 +20,7 @@
   <section class="screen active" id="screen-intro">
     <div class="intro">
       <div class="intro-shine" aria-hidden="true"></div>
-      <div class="logo intro-logo">MATH <b>LEGENDS</b></div>
+      <img class="intro-logo-img" src="assets/icons/logo.png" alt="Math Legends"><div class="logo intro-logo">MATH <b>LEGENDS</b></div>
       <div class="tagline intro-tagline">⚔️ BATTLE ARENA ⚔️</div>
       <div class="intro-heroes" id="intro-heroes"></div>
       <button class="btn big primary intro-btn" data-act="intro-start">▶️ MULAI</button>
@@ -42,7 +45,7 @@
       </div>
 
       <div class="home-hero">
-        <div class="logo">MATH <b>LEGENDS</b></div>
+        <img class="home-logo-img" src="assets/icons/logo.png" alt="Math Legends">
         <div class="tagline">⚔️ BATTLE ARENA ⚔️</div>
         <div class="mascot" id="h-mascot">⚔️</div>
       </div>
@@ -55,9 +58,11 @@
         <button class="tile" data-nav="achievements"><b>🏆</b><span>PRESTASI</span></button>
         <button class="tile" data-nav="leaderboard"><b>🏅</b><span>PAPAN SKOR</span></button>
         <button class="tile" data-nav="profile"><b>👤</b><span>PROFIL</span></button>
+        <button class="tile" data-nav="shop"><b>🛍️</b><span>TOKO</span></button>
       </div>
 
-      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.6 offline</span></div>
+      <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.7 offline</span></div>
+      <button class="link-btn" data-act="watch">📺 Mode Wasit (tonton turnamen)</button>
     </div>
   </section>
 
@@ -71,6 +76,7 @@
       </div>
       <div class="hero-cards" id="su-heroes"></div>
       <div class="panel hero-detail" id="su-detail"></div>
+      <div class="panel gear-summary" id="su-gear"></div>
       <h3 class="su-label">🤖 PILIH LAWAN AI</h3>
       <div class="ai-chips" id="su-ai"></div>
       <div class="su-online" id="su-online" style="display:none">
@@ -85,6 +91,7 @@
   <!-- ============ BATTLE ============ -->
   <section class="screen" id="screen-battle">
     <div class="battle" id="battle-root">
+      <span class="live-badge" id="b-live" style="display:none">🔴 LIVE</span>
       <button class="btn-quit" id="b-quit" data-act="quit">🏳️</button>
 
       <div class="b-top">
@@ -101,7 +108,8 @@
           </div>
         </div>
         <div class="vs-box">
-          <div class="round" id="b-round">1/18</div>
+          <div class="round" id="b-round">1/20</div>
+          <div class="b-code" id="b-code" style="display:none"></div>
           <div class="vs">VS</div>
         </div>
         <div class="fighter foe">
@@ -166,6 +174,18 @@
         <button class="btn primary" data-act="again">🔁 MAIN LAGI</button>
         <button class="btn ghost" data-nav="home">🏠 BERANDA</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ============ TOKO ATRIBUT ============ -->
+  <section class="screen" id="screen-shop">
+    <div class="page">
+      <div class="page-head">
+        <button class="back" data-nav="home">‹</button>
+        <h2>🛍️ TOKO ATRIBUT</h2><span></span>
+      </div>
+      <p class="page-desc">Perkuat hero-mu dengan koin 🪙 dan diamond 💎 yang kamu dapat dari bertanding. Bonus berlaku di semua mode (AI, latihan, dan PvP online).</p>
+      <div id="shop-list"></div>
     </div>
   </section>
 

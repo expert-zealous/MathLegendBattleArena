@@ -5,6 +5,28 @@ Cara paling simpel untuk GitHub Pages: ganti 1 file `index.html` (hasil build su
 
 ---
 
+## v0.7.0 — PWA + Logo & Favicon + Toko Atribut + Karakter Tubuh Utuh + Mode Wasit + HP Besar
+
+**Fitur baru:**
+- 📱 **PWA**: manifest + service worker + ikon — bisa "Install app" di Android/Desktop; cache offline setelah kunjungan pertama
+- 🖼️ **Logo game** (kiriman pengguna) tampil di layar pembuka & beranda; menjadi **favicon** dan ikon PWA
+- 🛍️ **TOKO ATRIBUT** (koin 🪙 / diamond 💎): ❤️ Jantung Titan (+6% HP/lv) • ⚔️ Mata Angka (+5% ATK/lv) • 💥 Jimat Kritis (+2% CRIT/lv, tier diamond) • 🛡️ Perisai Cerdas (+1 DEF/lv) — bonus aktif di AI, latihan & PvP (ikut terkirim saat matchmaking)
+- 🪙 **Bonus koin naik seiring level** pemain (+2 koin/level tiap match)
+- 🧍 **Karakter tubuh utuh** di arena dengan **pose menyerang** (10 gambar baru: siap & menyerang × 5 hero)
+- 📺 **MODE WASIT**: tonton pertandingan PvP live di layar besar/LCD — masukkan kode ruangan; mendukung mode turnamen kelas
+- ❤️ **HP semua hero +35%** & ronde maksimal 20 — pertandingan lebih panjang, saling serang lebih terasa (RAKA 190 · LYRA 145 · SENA 165 · KAGE 155 · MORRU 175)
+- AI juga memakai atribut ringan sesuai tingkat kesulitan
+
+**Perbaikan PvP (hasil uji end-to-end sungguhan ke Firebase):**
+- Matchmaking baru berbasis **lobby satu dokumen** (rooms/lobby) — transaksi terserialisasi, bebas race dua-HOST; entri basi >2 menit otomatis dibuang
+- FIX: host berhenti menjawab setelah ronde 1 (`_answeredLocal` tak direset)
+- FIX: event `end` tidak diteruskan ke host
+- FIX: gear ATK/DEF kini benar-benar memengaruhi damage/pertahanan
+
+**File berubah/baru:** `index.html` 🔁 · BARU: `assets/heroes/*-f.png & *-a.png` (10), `assets/icons/*` (logo/favicon/ikon), `manifest.json`, `sw.js`, `favicon-64.png`, `icon-192.png`, `icon-512.png` (dihasilkan build) · ganti: `src/js/data.js`, `rules.js`, `battle.js`, `player.js`, `pvp.js`, `ui.js`, `main.js`, `src/index.html`, `src/css/style.css`, `build.py`, `test/*`, `README-FIREBASE.md` (rules + opsi delete)
+
+---
+
 ## v0.6.0 — PVP ONLINE 1v1 (Firebase aktif: battle-arena-246ce)
 
 **Fitur:**

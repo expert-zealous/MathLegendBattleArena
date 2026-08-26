@@ -11,6 +11,19 @@
 
   const el = function (id) { return document.getElementById(id); };
   const esc = U.esc;
+  function gearEffectText(it, lv) {
+    if (it.stat === 'hp') return '+' + Math.round(it.per * lv * 100) + '% HP';
+    if (it.stat === 'atk') return '+' + Math.round(it.per * lv * 100) + '% ATK';
+    if (it.stat === 'crit') return '+' + Math.round(it.per * lv * 100) + '% CRIT';
+    return '+' + Math.round(it.per * lv) + ' DEF';
+  }
+
+  // gambar tubuh utuh utk arena (imgF = siap, imgA = menyerang)
+  function heroBody(h) {
+    if (!h) return '';
+    if (h.imgF) return '<img class="hero-img" src="' + h.imgF + '" data-atk="' + (h.imgA || h.imgF) + '" data-idle="' + h.imgF + '" draggable="false">';
+    return heroImg(h);
+  }
 
   // gambar hero (fallback ke emoji bila file tak tersedia)
   function heroImg(h, cls) {
@@ -37,7 +50,7 @@
         home: this.renderHome, setup: this.renderSetup, learn: this.renderLearn,
         missions: this.renderMissions, achievements: this.renderAchievements,
         leaderboard: this.renderBoard, profile: this.renderProfile,
-        intro: this.renderIntro
+        intro: this.renderIntro, shop: this.renderShop
       }[name];
       if (render) render.call(this);
     },
@@ -111,6 +124,35 @@
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     },
 
+    /* modal wasit: masukkan kode ruangan */
+    watchModal: function (cb) {
+      const self = this;
+      const bd = this.modal(
+        '<h3>📺 Mode Wasit</h3>' +
+        '<p>Masukkan <b>kode ruangan</b> yang tampil di layar pemain (contoh: 4 karakter pertama ID ruangan). Layar ini cocok untuk proyektor/LCD turnamen.</p>' +
+        '<input id="watch-input" maxlength="40" placeholder="Kode ruangan" autocomplete="off">' +
+        '<div class="m-actions">' +
+        '<button class="btn ghost" data-mact="no">BATAL</button>' +
+        '<button class="btn primary" data-mact="go">TONTON 📺</button>' +
+        '</div>'
+      );
+      const input = bd.querySelector('#watch-input');
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 60);
+      function go() {
+        const v = (input.value || '').trim();
+        self.closeModal();
+        if (v) cb(v);
+      }
+      bd.addEventListener('click', function (e) {
+        const b = e.target.closest('[data-mact]');
+        if (!b) return;
+        const a = b.getAttribute('data-mact');
+        self.closeModal();
+        if (a === 'go') go();
+      });
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    },
+
     /* modal mencari lawan PvP (dengan pembatalan) */
     searchingModal: function (onCancel) {
       const self = this;
@@ -145,7 +187,7 @@
       el('h-mascot').innerHTML = heroImg(P.heroDef());
       el('h-mr').textContent = pf.mr;
       const net = el('h-net');
-      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.6 🟢 online' : 'v0.6 offline';
+      if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.7 🟢 online' : 'v0.7 offline';
     },
 
     /* ================= SETUP ================= */
@@ -187,6 +229,35 @@
 
       const online = !!(ML.Backend && ML.Backend.online);
       el('su-online').style.display = online ? '' : 'none';
+      const g = P.computeGear();
+      const any = g.hpMul || g.atkMul || g.critAdd || g.defAdd;
+      el('su-gear').innerHTML = any
+        ? '🛍️ Atribut aktif: <b>+' + Math.round(g.hpMul * 100) + '% HP</b> • <b>+' + Math.round(g.atkMul * 100) + '% ATK</b> • <b>+' + Math.round(g.critAdd * 100) + '% CRIT</b> • <b>+' + Math.round(g.defAdd) + ' DEF</b> — <button class="link-btn" data-nav="shop">tingkatkan</button>'
+        : '🛍️ Belum ada atribut — <button class="link-btn" data-nav="shop">buka TOKO</button> (beli pakai koin/diamond);';
+    },
+
+    /* ================= TOKO ATRIBUT ================= */
+    renderShop: function () {
+      const pf = P.data;
+      el('shop-list').innerHTML =
+        '<div class="panel gear-card" style="margin-bottom:10px">' +
+        '<div class="g-icon">💰</div><div class="g-info"><div class="g-name">Koin: ' + pf.coins + ' 🪙 • Diamond: ' + pf.diamonds + ' 💎</div>' +
+        '<div class="g-desc">Dapat dari pertandingan & misi — makin tinggi levelmu, makin besar bonus koin per match.</div></div></div>' +
+        D.gear.map(function (it) {
+          const lv = P.gearLevel(it.id);
+          const cost = P.nextGearCost(it.id);
+          const pips = Array.from({ length: it.max }, function (_, i) { return '<i class="' + (i < lv ? 'on' : '') + '"></i>'; }).join('');
+          const btn = !cost
+            ? '<button class="btn ghost" disabled>MAKS ✓</button>'
+            : '<button class="btn ' + (cost.gem ? 'online' : 'primary') + '" data-act="buy-gear" data-id="' + it.id + '">' +
+              (cost.coin ? '🪙 ' + cost.coin : '💎 ' + cost.gem) + '</button>';
+          return '<div class="panel gear-card" style="margin-bottom:10px">' +
+            '<div class="g-icon">' + it.emoji + '</div>' +
+            '<div class="g-info"><div class="g-name">' + it.name + ' <span class="pips">' + pips + '</span></div>' +
+            '<div class="g-desc">' + it.desc + ' • sekarang: Level ' + lv + '/' + it.max + '</div>' +
+            '<div class="g-lv">' + (lv > 0 ? 'Bonus aktif: ' + gearEffectText(it, lv) : 'Belum dibeli') + '</div></div>' +
+            '<div class="g-buy">' + btn + '</div></div>';
+        }).join('');
     },
 
     /* ================= LEARN ================= */
@@ -362,7 +433,8 @@
       }).join('');
       if (sum.xpScaled) rows += '<div class="rw-row"><span>Mode latihan (×0.6)</span><b>·</b></div>';
       rows += '<div class="rw-row total"><span>⭐ TOTAL XP</span><b>+' + sum.xpTotal + '</b></div>';
-      rows += '<div class="rw-row"><span>🪙 Coin</span><b class="up">+' + sum.coins + '</b></div>';
+      rows += '<div class="rw-row"><span>\ud83e\ude99 Coin</span><b class="up">+' + sum.coins + '</b></div>';
+      if (sum.levelBonus > 0) rows += '<div class="rw-row"><span>\ud83c\udfc5 Bonus Level (' + sum.level + ')</span><b class="up">+' + sum.levelBonus + '</b></div>';
       if (sum.diamonds > 0) rows += '<div class="rw-row"><span>💎 Diamond</span><b class="up">+' + sum.diamonds + '</b></div>';
       if (!res.practice) {
         rows += '<div class="rw-row"><span>' + sum.rankAfter.icon + ' ' + sum.rankAfter.name + '</span>' +
@@ -473,8 +545,17 @@
       rp.style.borderColor = p.hero.color2; re.style.borderColor = '#fda4af';
       el('b-p-name').textContent = (engine.cfg.playerName || 'KAMU');
       el('b-e-name').textContent = '🤖 ' + engine.ai.level.bot;
-      el('b-hero-p').innerHTML = heroImg(p.hero);
-      el('b-hero-e').innerHTML = heroImg(e.hero);
+      el('b-hero-p').innerHTML = heroBody(p.hero);
+      el('b-hero-e').innerHTML = heroBody(e.hero);
+      const code = el('b-code'), live = el('b-live');
+      const pvp = engine.cfgPvp;
+      if (code && live) {
+        if (pvp && pvp.role !== 'watch') {
+          code.style.display = '';
+          code.textContent = 'KODE ' + String(pvp.roomId || '').slice(0, 6).toUpperCase();
+        } else code.style.display = 'none';
+        live.style.display = (pvp && pvp.role === 'watch') ? '' : 'none';
+      }
       el('b-hero-p').style.borderColor = p.hero.color2;
       el('b-hero-e').style.borderColor = '#fda4af';
 
@@ -664,6 +745,12 @@
         arena.classList.remove('shake'); void arena.offsetWidth; arena.classList.add('shake');
       }
       this._heroFx(d);
+      // pose menyerang: gambar tubuh utuh berganti sesaat
+      const figImg = atkFig.querySelector('img');
+      if (figImg && figImg.dataset.atk) {
+        figImg.src = figImg.dataset.atk;
+        setTimeout(function () { figImg.src = figImg.dataset.idle; }, 650);
+      }
 
       // angka damage (dibatasi jumlah node)
       const fx = el('b-fx');

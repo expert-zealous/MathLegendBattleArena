@@ -54,6 +54,7 @@
       roomId: info.roomId,
       myHeroId: P.data.hero,
       myName: P.data.name || 'PEMAIN',
+      myGear: P.computeGear(),
       opp: info.opp
     });
     App.battle = net;
@@ -72,7 +73,47 @@
     UI.toast('⚔️ Lawan: ' + U.esc(info.opp.name));
   }
 
+  function startWatch(roomIdRaw) {
+    endBattleSilently();
+    const roomId = String(roomIdRaw || '').trim();
+    if (!roomId) { UI.toast('Masukkan kode ruangan'); return; }
+    const B = ML.Backend;
+    const net = new ML.NetBattle({
+      fb: B._fb, role: 'watch', roomId: roomId,
+      myHeroId: P.data.hero, myName: 'WASIT',
+      hostName: 'HOST', guestName: 'GUEST'
+    });
+    App.battle = net;
+    UI.attachBattle(net);
+    const root = document.getElementById('battle-root');
+    if (root) root.classList.add('mode-watch');
+    net.on('watchend', function (d) {
+      UI.detachBattle(); net.destroy();
+      if (App.battle === net) App.battle = null;
+      if (root) root.classList.remove('mode-watch');
+      const h = d.host || {}, g = d.guest || {};
+      const nm = function (x) { return U.esc(x && (x.oppName || x.playerName) || ''); };
+      UI.confirmModal('🏁 Pertandingan Selesai',
+        (d.winner === 'host' ? '🏆 <b>' + nm(h) + '</b> (host) menang!' :
+         d.winner === 'guest' ? '🏆 <b>' + (U.esc(g.playerName || 'GUEST')) + '</b> (guest) menang!' : 'Seri!') +
+        '<br><small>' + (h.rounds || 0) + ' ronde • HOST ' + Math.round((h.accuracy || 0) * 100) + '% vs GUEST ' + Math.round((g.accuracy || 0) * 100) + '%</small>',
+        'SELESAI', false, function () { UI.show('home'); });
+    });
+    net.on('aborted', function () {
+      UI.detachBattle(); net.destroy();
+      if (App.battle === net) App.battle = null;
+      if (root) root.classList.remove('mode-watch');
+      UI.toast('⚠️ Siaran berakhir (pemain terputus)');
+      UI.show('home');
+    });
+    net.start();
+    UI.show('battle');
+    UI.toast('📺 Mode wasit aktif — ruangan ' + roomId.slice(0, 6).toUpperCase());
+  }
+
   function endBattleSilently() {
+    const root0 = document.getElementById('battle-root');
+    if (root0) root0.classList.remove('mode-watch');
     if (App.battle) {
       UI.detachBattle();
       App.battle.destroy();
@@ -115,6 +156,8 @@
           heroId: s.heroId,
           aiHeroId: D.heroes[U.ri(0, D.heroes.length - 1)].id,
           aiLevelIdx: s.aiIdx,
+          playerGear: P.computeGear(),
+          enemyGear: { hpMul: 0.03 * s.aiIdx, atkMul: 0.02 * s.aiIdx, critAdd: 0.01 * s.aiIdx, defAdd: s.aiIdx >= 2 ? 1 : 0 },
           topicFocus: s.mode === 'practice' ? s.topic : null,
           practice: s.mode === 'practice',
           playerName: P.data.name
@@ -133,7 +176,7 @@
         UI.searchingModal(function () { if (handle) handle.cancel(); });
         handle = ML.PVP.findMatch(
           B._fb,
-          { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr },
+          { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() },
           function (info) { UI.closeModal(); startNetBattle(info); },
           function (err) {
             UI.closeModal();
@@ -178,6 +221,8 @@
           heroId: P.data.hero,
           aiHeroId: D.heroes[U.ri(0, D.heroes.length - 1)].id,
           aiLevelIdx: 1,
+          playerGear: P.computeGear(),
+          enemyGear: null,
           topicFocus: t.getAttribute('data-topic'),
           practice: true,
           playerName: P.data.name
@@ -221,6 +266,24 @@
           });
         });
         break;
+
+      case 'buy-gear': {
+        const id = t.getAttribute('data-id');
+        const r = P.buyGear(id);
+        AU.play(r.ok ? 'coin' : 'wrong');
+        UI.toast(r.ok ? '🎉 ' + r.msg : '⚠️ ' + r.msg, r.ok);
+        UI.renderShop();
+        if (UI.current === 'setup') UI.renderSetup();
+        break;
+      }
+
+      case 'watch': {
+        const B2 = ML.Backend;
+        if (!B2 || !B2.online || !B2._fb || !B2.user) { UI.toast('ℹ️ Mode wasit butuh mode online'); break; }
+        AU.play('click');
+        UI.watchModal(function (roomId) { startWatch(roomId); });
+        break;
+      }
 
       case 'board-tab':
         UI.boardTab = t.getAttribute('data-tab');
@@ -284,6 +347,13 @@
       AU._ensure();
       document.removeEventListener('touchstart', unlock);
     }, { once: true });
+
+    // PWA: daftar service worker bila dijalankan dari server web
+    try {
+      if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      }
+    } catch (e) {}
 
     // tampilkan layar pembuka; tombol MULAI membuka audio + beranda/nama
     UI.show('intro');

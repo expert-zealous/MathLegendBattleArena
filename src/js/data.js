@@ -9,14 +9,14 @@
   const U = ML.util;
 
   ML.DATA = {
-    version: '0.6.0',
+    version: '0.7.0',
 
     /* ---------- HERO (5 hero, identitas original; gambar karakter di folder assets) ---------- */
     heroes: [
       {
         id: 'raka', name: 'RAKA', role: 'KNIGHT', title: 'Spesialis Pertahanan',
-        emoji: '⚔️', img: 'assets/heroes/raka.png', color: '#2563eb', color2: '#60a5fa',
-        hp: 140, atk: 15, def: 6,
+        emoji: '⚔️', img: 'assets/heroes/raka.png', imgF: 'assets/heroes/raka-f.png', imgA: 'assets/heroes/raka-a.png', color: '#2563eb', color2: '#60a5fa',
+        hp: 190, atk: 15, def: 6,
         passive: { name: 'Benteng Baja', desc: 'Semua damage yang diterima berkurang 15%.' },
         skill: {
           id: 'shield', name: 'SHIELD WALL', emoji: '🛡️', cost: 5,
@@ -25,8 +25,8 @@
       },
       {
         id: 'lyra', name: 'LYRA', role: 'MAGE', title: 'Spesialis Serangan Besar',
-        emoji: '🔥', img: 'assets/heroes/lyra.png', color: '#ea580c', color2: '#fb923c',
-        hp: 105, atk: 23, def: 2,
+        emoji: '🔥', img: 'assets/heroes/lyra.png', imgF: 'assets/heroes/lyra-f.png', imgA: 'assets/heroes/lyra-a.png', color: '#ea580c', color2: '#fb923c',
+        hp: 145, atk: 23, def: 2,
         passive: { name: 'Naluri Api', desc: 'Peluang CRITICAL +12%.' },
         skill: {
           id: 'meteor', name: 'METEOR', emoji: '☄️', cost: 8,
@@ -35,8 +35,8 @@
       },
       {
         id: 'sena', name: 'SENA', role: 'ARCHER', title: 'Spesialis Kecepatan',
-        emoji: '🏹', img: 'assets/heroes/sena.png', color: '#059669', color2: '#34d399',
-        hp: 120, atk: 19, def: 4,
+        emoji: '🏹', img: 'assets/heroes/sena.png', imgF: 'assets/heroes/sena-f.png', imgA: 'assets/heroes/sena-a.png', color: '#059669', color2: '#34d399',
+        hp: 165, atk: 19, def: 4,
         passive: { name: 'Refleks Kilat', desc: 'Jawaban PERFECT: +1 Energy tambahan & damage +10%.' },
         skill: {
           id: 'rain', name: 'HUJAN PANAH', emoji: '🎯', cost: 6,
@@ -45,8 +45,8 @@
       },
       {
         id: 'kage', name: 'KAGE', role: 'NINJA', title: 'Spesialis Critical Attack',
-        emoji: '🥷', img: 'assets/heroes/ninja.png', color: '#7c3aed', color2: '#a78bfa',
-        hp: 112, atk: 21, def: 3,
+        emoji: '🥷', img: 'assets/heroes/ninja.png', imgF: 'assets/heroes/kage-f.png', imgA: 'assets/heroes/kage-a.png', color: '#7c3aed', color2: '#a78bfa',
+        hp: 155, atk: 21, def: 3,
         passive: { name: 'Mata Bayangan', desc: 'Peluang CRITICAL +15%.' },
         skill: {
           id: 'shadow', name: 'SHADOW STRIKE', emoji: '🥷', cost: 6,
@@ -55,14 +55,26 @@
       },
       {
         id: 'morru', name: 'MORRU', role: 'NECROMANCER', title: 'Spesialis Recovery & Soul',
-        emoji: '💀', img: 'assets/heroes/necro.png', color: '#0d9488', color2: '#2dd4bf',
-        hp: 128, atk: 17, def: 4,
+        emoji: '💀', img: 'assets/heroes/necro.png', imgF: 'assets/heroes/morru-f.png', imgA: 'assets/heroes/morru-a.png', color: '#0d9488', color2: '#2dd4bf',
+        hp: 175, atk: 17, def: 4,
         passive: { name: 'Soul Harvest', desc: 'Setiap jawaban benar menyembuhkan 2 HP.' },
         skill: {
           id: 'drain', name: 'SOUL DRAIN', emoji: '👻', cost: 6,
           desc: 'Jawaban benar berikutnya: damage ×1.25 dan 75%-nya menjadi HP-mu. Salah jawab = hilang.'
         }
       }
+    ],
+
+    /* ---------- TOKO ATRIBUT (dibeli koin/diamond; bonus menumpuk per level) ---------- */
+    gear: [
+      { id: 'heart', name: 'Jantung Titan', emoji: '❤️', stat: 'hp', per: 0.06, max: 5,
+        desc: '+6% HP per level', costs: [{ coin: 40 }, { coin: 80 }, { coin: 160 }, { coin: 300 }, { coin: 500 }] },
+      { id: 'blade', name: 'Mata Angka', emoji: '⚔️', stat: 'atk', per: 0.05, max: 5,
+        desc: '+5% Attack per level', costs: [{ coin: 50 }, { coin: 100 }, { coin: 200 }, { coin: 350 }, { coin: 600 }] },
+      { id: 'charm', name: 'Jimat Kritis', emoji: '💥', stat: 'crit', per: 0.02, max: 4,
+        desc: '+2% peluang CRITICAL per level', costs: [{ coin: 60 }, { coin: 140 }, { coin: 320 }, { gem: 5 }] },
+      { id: 'aegis', name: 'Perisai Cerdas', emoji: '🛡️', stat: 'def', per: 1, max: 3,
+        desc: '+1 Defense per level', costs: [{ coin: 80 }, { coin: 180 }, { gem: 3 }] }
     ],
 
     /* ---------- LEVEL AI (akurasi & kecepatan bervariasi, bukan random murni) ---------- */
