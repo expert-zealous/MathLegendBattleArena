@@ -17,6 +17,11 @@
   const G = typeof window !== 'undefined' ? window : globalThis;
   const ML = (G.ML = G.ML || {});
   const U = ML.util;
+  // Backend menyimpan UID pada ML.Backend.user, bukan pada _fb.
+  // Gunakan helper ini agar semua jalur PvP selalu mendapat UID yang valid.
+  function getUid(fb) {
+    return String((fb && fb.uid) || (ML.Backend && ML.Backend.user && ML.Backend.user.uid) || '').trim();
+  }
 
   const HB_MS = 5000;      // interval heartbeat
   const HB_STALE = 20000;  // dianggap putus
@@ -46,7 +51,8 @@
   const PVP = (ML.PVP = {
     /* fb: {fs, db, uid}; me: {name, hero, mr, gear?}; onFound({role, roomId, opp}); onFail(err) */
     findMatch: function (fb, me, onFound, onFail) {
-      const fs = fb.fs, db = fb.db, uid = fb.uid;
+      const fs = fb.fs, db = fb.db, uid = getUid(fb);
+      if (!fs || !db || !uid) { onFail && onFail('firebase-user-unavailable'); return { cancel: function () {} }; }
       const lobbyRef = fs.doc(db, 'rooms', 'lobby');
       const myRef = fs.doc(db, 'matchmaking', uid);
       let cancelled = false, done = false, pollers = [];
@@ -226,7 +232,8 @@
      Guest claims the room AND changes status to `playing` in one write.
      Host only observes. This removes the old host-side write/transaction race. */
   PVP.createRoom = function (fb, me, code, onFound, onFail, onState) {
-    const fs = fb.fs, db = fb.db, uid = fb.uid;
+    const fs = fb.fs, db = fb.db, uid = getUid(fb);
+      if (!fs || !db || !uid) { onFail && onFail('firebase-user-unavailable'); return { cancel: function () {} }; }
     let unsubRoom = null, unsubMM = null, poll = null, timer = null, done = false;
     code = String(code || PVP.makeCode()).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     const roomRef = fs.doc(db, 'rooms', code);
@@ -356,7 +363,8 @@
   };
 
   PVP.joinRoom = function (fb, me, code, onFound, onFail, onState) {
-    const fs = fb.fs, db = fb.db, uid = fb.uid;
+    const fs = fb.fs, db = fb.db, uid = getUid(fb);
+      if (!fs || !db || !uid) { onFail && onFail('firebase-user-unavailable'); return { cancel: function () {} }; }
     const cleanCode = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
     if (!cleanCode) { onFail && onFail('invalid-code'); return {cancel:function(){}}; }
     const roomRef = fs.doc(db, 'rooms', cleanCode);
