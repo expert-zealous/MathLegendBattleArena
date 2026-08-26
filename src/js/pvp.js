@@ -303,7 +303,7 @@
       guest: null, guestUid: null, guestName: null, guestHero: null,
       guestMr: null, guestGear: null,
       createdAt: Date.now(), updatedAt: Date.now()
-    }).then(function () {
+    })).then(function () {
       if (onState) onState('waiting');
 
       // Realtime listener.
