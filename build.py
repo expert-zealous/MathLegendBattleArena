@@ -36,19 +36,9 @@ def js_repl(m):
 
 html = re.sub(r'<script src="([^"]+)"></script>', js_repl, html)
 
-# inline gambar hero & logo sebagai data URI agar index.html tetap satu file mandiri
-# (ikon PWA TIDAK di-inline: manifest memerlukan file nyata)
-assets = ROOT / "assets"
-if assets.exists():
-    for p in sorted(assets.rglob("*")):
-        if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
-            if p.name.startswith("icon-") or p.name.startswith("favicon-"):
-                continue
-            rel = p.relative_to(ROOT).as_posix()
-            mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
-            b64 = base64.b64encode(p.read_bytes()).decode("ascii")
-            html = html.replace(rel, f"data:{mime};base64,{b64}")
-
+# Gambar hero/logo TIDAK di-inline ke index.html.
+# index.html sengaja menggunakan path relatif assets/ agar selalu mengambil
+# PNG asli yang ada di paket game.
 # ---- PWA: salin ikon ke root, tulis manifest.json & sw.js ----
 icons = ROOT / "assets" / "icons"
 if icons.exists():
@@ -122,7 +112,7 @@ self.addEventListener('fetch', (e) => {
 assert "<link rel=\"stylesheet\"" not in html, "CSS belum ter-inline!"
 body = html.split("<body>")[1]
 assert 'src="js/' not in body and 'src="css/' not in body, "Masih ada referensi file eksternal!"
-assert not re.search(r'assets/heroes/[\w-]+\.(png|jpe?g|webp|gif)', html), "Masih ada path gambar yang belum ter-inline!"
+# Hero image paths are intentionally kept relative to assets/.
 
 OUT.write_text(html, encoding="utf-8")
 print(f"OK -> {OUT} ({len(html)/1024:.1f} KB)")
