@@ -246,7 +246,7 @@
       el('h-xpfill').style.width = Math.round((lv.cur / lv.need) * 100) + '%';
       el('h-coins').textContent = '🪙 ' + pf.coins;
       el('h-diamonds').textContent = '💎 ' + pf.diamonds;
-      el('h-mascot').innerHTML = heroImg(P.heroDef());
+      el('h-mascot').innerHTML = heroBody(P.heroDef(), 'p');
       el('h-mr').textContent = pf.mr;
       const net = el('h-net');
       if (net) net.textContent = ML.Backend && ML.Backend.online ? 'v0.8.4 🟢 online' : 'v0.8.4 offline';
@@ -612,6 +612,17 @@
       el('b-e-name').textContent = '🤖 ' + engine.ai.level.bot;
       el('b-hero-p').innerHTML = heroBody(p.hero, 'p');
       el('b-hero-e').innerHTML = heroBody(e.hero, 'e');
+      const arena = el('b-arena');
+      if (arena) {
+        arena.querySelectorAll('.combo-float').forEach(function(n){ n.remove(); });
+        ['p','e'].forEach(function(side){
+          const n = document.createElement('div');
+          n.className = 'combo-float ' + side;
+          n.id = 'b-combo-float-' + side;
+          n.setAttribute('aria-hidden','true');
+          arena.appendChild(n);
+        });
+      }
       const code = el('b-code'), live = el('b-live');
       const pvp = engine.cfgPvp;
       if (code && live) {
@@ -672,29 +683,21 @@
       for (let i = 0; i < E1.length; i++) E1[i].classList.toggle('on', i < ee);
     },
     _updCombo: function (side, combo) {
-      // Combo dipindahkan dari header/VS ke atas karakter agar arena lebih bersih.
-      // Badge lama sengaja disembunyikan, tetapi tetap dipelihara untuk kompatibilitas DOM.
       const badge = el(side === 'p' ? 'b-p-combo' : 'b-e-combo');
       const fig = el(side === 'p' ? 'b-hero-p' : 'b-hero-e');
-      if (badge) {
-        badge.classList.remove('on', 'pop');
-        badge.textContent = '';
-      }
-      if (!fig) return;
-
-      fig.classList.remove('combo-active', 'combo-2', 'combo-3', 'combo-4', 'combo-5', 'combo-6');
-      fig.removeAttribute('data-combo-label');
-      fig.removeAttribute('data-combo-level');
-      if (combo >= 2) {
+      const float = el('b-combo-float-' + side);
+      if (badge) { badge.classList.remove('on', 'pop'); badge.textContent = ''; }
+      if (fig) fig.classList.remove('combo-active', 'combo-2', 'combo-3', 'combo-4', 'combo-5', 'combo-6', 'combo-burst');
+      if (fig) { fig.removeAttribute('data-combo-label'); fig.removeAttribute('data-combo-level'); }
+      if (float) { float.className = 'combo-float ' + side; float.textContent = ''; }
+      if (combo >= 2 && fig && float) {
         const label = R.comboLabel(combo) || ('COMBO x' + combo);
-        fig.classList.add('combo-active');
-        fig.classList.add('combo-' + Math.min(6, combo));
-        fig.setAttribute('data-combo-label', '🔥 ' + label + ' 🔥');
+        fig.classList.add('combo-active', 'combo-' + Math.min(6, combo));
         fig.setAttribute('data-combo-level', String(combo));
-        // Re-trigger aura burst setiap combo meningkat.
-        fig.classList.remove('combo-burst');
-        void fig.offsetWidth;
-        fig.classList.add('combo-burst');
+        float.textContent = '🔥 ' + label + ' 🔥';
+        float.classList.add('on', 'combo-' + Math.min(6, combo));
+        float.classList.remove('burst'); void float.offsetWidth; float.classList.add('burst');
+        fig.classList.remove('combo-burst'); void fig.offsetWidth; fig.classList.add('combo-burst');
       }
     },
     _updShield: function (ps, es) {

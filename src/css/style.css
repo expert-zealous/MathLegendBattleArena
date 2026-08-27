@@ -886,3 +886,56 @@ body {
 
 /* baris status koneksi pada modal PvP */
 .m-status { font-size: 13px; font-weight: 800; color: #4338ca; margin: 6px 0 2px; }
+
+
+/* ================= V12 CHARACTER POLISH ================= */
+/* Semua karakter foreground adalah PNG RGBA: tanpa bingkai dan tanpa latar. */
+.intro-heroes .ih { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+.intro-heroes .ih img, .intro-hero-img { background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; object-fit: contain !important; }
+
+/* Home: karakter tepat di tengah dan lurus dengan logo, tanpa frame/avatar. */
+.home-hero { display:flex; flex-direction:column; align-items:center; text-align:center; }
+.home-logo-img, .home-hero .tagline { flex:0 0 auto; }
+.mascot { width:100%; height:clamp(118px,24vw,170px); margin:2px 0 0; display:flex; align-items:flex-end; justify-content:center; background:transparent !important; filter:none; animation:none; }
+.mascot .hero-img { width:clamp(90px,22vw,138px); height:100%; object-fit:contain; border:0 !important; border-radius:0 !important; box-shadow:none !important; background:transparent !important; animation:homeBreath 2.5s ease-in-out infinite; transform-origin:50% 90%; }
+@keyframes homeBreath { 0%,100% { transform:scale(1); } 45% { transform:scale(1.035); } 70% { transform:scale(.985); } }
+
+/* Arena: napas terlihat sebagai perubahan ukuran tubuh, bukan gerak naik-turun. */
+.hero-fig .hero-img { animation:heroBreathV12 2.15s ease-in-out infinite !important; transform-origin:50% 88%; }
+@keyframes heroBreathV12 { 0%,100% { transform:var(--hero-flip, none) scale(1); } 38% { transform:var(--hero-flip, none) scale(1.045); } 58% { transform:var(--hero-flip, none) scale(1.055); } 78% { transform:var(--hero-flip, none) scale(.982); } }
+
+/* Aura benar-benar di sekitar tubuh hero, bukan di kotak combo. */
+.hero-fig.combo-active::before {
+  width:92%; height:104%; left:50%; top:53%;
+  border-radius:50% 50% 44% 44% / 45% 45% 55% 55%;
+  background:
+    radial-gradient(ellipse at 50% 76%, rgba(255,250,190,.96) 0 8%, rgba(255,174,0,.82) 18%, rgba(255,83,0,.56) 36%, rgba(239,68,68,.24) 56%, transparent 76%),
+    radial-gradient(ellipse at 34% 44%, rgba(255,190,30,.60), transparent 34%),
+    radial-gradient(ellipse at 68% 40%, rgba(255,90,0,.54), transparent 36%);
+  filter:blur(5px); mix-blend-mode:screen; opacity:.9; z-index:1;
+  animation:bodyFireAuraV12 .85s ease-in-out infinite;
+}
+.hero-fig.combo-active .hero-img { filter:drop-shadow(0 0 4px rgba(255,238,150,.95)) drop-shadow(0 0 11px rgba(255,126,0,.75)) drop-shadow(0 0 20px rgba(239,68,68,.45)); }
+@keyframes bodyFireAuraV12 { 0%,100% { transform:translate(-50%,-50%) scale(.94,.98); opacity:.65; } 50% { transform:translate(-50%,-50%) scale(1.08,1.12); opacity:1; } }
+
+/* Combo label adalah elemen terpisah: selalu simetris terhadap hero dan tidak ikut scale/lunge karakter. */
+.hero-fig.combo-active::after { content:none !important; }
+.combo-float { position:absolute; z-index:12; top:4px; width:118px; min-height:22px; padding:4px 7px; display:none; align-items:center; justify-content:center; text-align:center; white-space:normal; line-height:1.05; font-size:10px; font-weight:1000; letter-spacing:.35px; color:#fff; background:linear-gradient(135deg,#9a3412,#dc2626 55%,#f59e0b); border:1px solid rgba(255,255,255,.72); border-radius:12px; box-shadow:0 4px 14px rgba(239,68,68,.24); text-shadow:0 2px 3px rgba(0,0,0,.5); pointer-events:none; }
+.combo-float.on { display:flex; animation:comboFloatInV12 .34s cubic-bezier(.2,1.4,.35,1) both; }
+.combo-float.p { left:calc(10% + 48px - 59px); }
+.combo-float.e { right:calc(10% + 48px - 59px); }
+.combo-float.combo-4,.combo-float.combo-5,.combo-float.combo-6 { font-size:10.5px; width:124px; padding:5px 7px; }
+.combo-float.burst { animation:comboFloatBurstV12 .46s cubic-bezier(.2,1.45,.35,1) both; }
+@keyframes comboFloatInV12 { 0% { opacity:0; transform:translateY(5px) scale(.72); } 100% { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes comboFloatBurstV12 { 0% { opacity:0; transform:translateY(7px) scale(.6); } 65% { opacity:1; transform:translateY(-1px) scale(1.08); } 100% { opacity:1; transform:translateY(0) scale(1); } }
+
+/* Responsive: pusat label mengikuti posisi visual hero di layar kecil. */
+@media (orientation:landscape) and (max-height:560px) {
+  .combo-float.p { left:calc(15% + 36px - 59px); }
+  .combo-float.e { right:calc(15% + 36px - 59px); }
+}
+@media (orientation:landscape) and (max-height:430px) {
+  .combo-float { width:106px; font-size:9px; top:1px; }
+  .combo-float.p { left:calc(15% + 23px - 53px); }
+  .combo-float.e { right:calc(15% + 23px - 53px); }
+}
