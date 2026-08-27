@@ -131,14 +131,21 @@ body {
 .intro-logo { font-size: clamp(34px, 11vw, 56px); animation: bounceIn .6s ease both; position: relative; }
 .intro-tagline { font-size: 13px; letter-spacing: 7px; animation: fadeInUp .5s ease .25s both; position: relative; }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-.intro-heroes { display: flex; gap: clamp(6px, 2vw, 14px); margin: 8px 0 4px; position: relative; }
+.intro-heroes {
+  width: 100%; display: flex; justify-content: center; align-items: flex-end;
+  gap: clamp(4px, 2vw, 14px); margin: 8px 0 4px; position: relative;
+}
 .intro-heroes .ih {
-  width: clamp(48px, 13vw, 72px); height: clamp(48px, 13vw, 72px);
-  border-radius: 50%; overflow: hidden; border: 3px solid #fff;
-  box-shadow: 0 8px 18px rgba(99, 102, 241, .25);
+  width: clamp(58px, 14vw, 82px); height: clamp(78px, 19vw, 108px);
+  border-radius: 0; overflow: visible; border: none;
+  background: transparent; box-shadow: none;
+  display: flex; align-items: flex-end; justify-content: center;
   animation: heroPop .45s ease both;
 }
-.intro-heroes .ih img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.intro-heroes .ih img {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+  border: none; border-radius: 0; filter: drop-shadow(0 8px 10px rgba(99,102,241,.18));
+}
 @keyframes heroPop { 0% { transform: scale(0) rotate(-14deg); opacity: 0; } 70% { transform: scale(1.14); opacity: 1; } 100% { transform: scale(1); } }
 .intro-btn { animation: fadeInUp .5s ease .7s both, pulse 1.6s ease 1.2s infinite; min-width: 220px; position: relative; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -403,61 +410,82 @@ body {
   pointer-events: none;
 }
 @keyframes heroBreath {
-  0%, 100% { transform: var(--hero-flip, none) translateY(0) scale(1); }
-  45% { transform: var(--hero-flip, none) translateY(-2px) scale(1.012, .992); }
-  70% { transform: var(--hero-flip, none) translateY(0) scale(1.018, .986); }
+  0%, 100% { transform: var(--hero-flip, none) scale(1); }
+  45% { transform: var(--hero-flip, none) scale(1.028, 1.018); }
+  70% { transform: var(--hero-flip, none) scale(.992, .986); }
 }
 
-/* Aura combo: menyala di sekitar hero yang sedang menyimpan combo. */
+/* Combo: aura api menempel pada tubuh hero, bukan pada kotak notifikasi. */
 .hero-fig.combo-active::before {
   content: '';
   position: absolute;
-  left: 50%; top: 55%;
-  width: 74%; height: 74%;
-  transform: translate(-50%, -50%) scale(.92);
-  border-radius: 50%;
+  left: 50%; top: 52%;
+  width: 108%; height: 112%;
+  transform: translate(-50%, -50%);
+  border-radius: 48% 52% 44% 56% / 55% 48% 52% 45%;
   background:
-    radial-gradient(circle, rgba(255,247,190,.70) 0%, rgba(255,146,0,.30) 34%, rgba(239,68,68,.18) 58%, transparent 72%);
-  filter: blur(5px);
-  opacity: .78;
+    radial-gradient(ellipse at 50% 72%, rgba(255,246,180,.82) 0 12%, rgba(255,126,0,.58) 28%, rgba(239,68,68,.30) 48%, transparent 72%),
+    radial-gradient(ellipse at 35% 38%, rgba(255,190,40,.50), transparent 38%),
+    radial-gradient(ellipse at 68% 34%, rgba(255,75,0,.42), transparent 40%);
+  filter: blur(6px);
+  opacity: .9;
   z-index: 1;
-  animation: comboAura 1s ease-in-out infinite;
+  animation: comboFireAura 1.05s ease-in-out infinite;
   pointer-events: none;
+}
+.hero-fig.combo-active .hero-img {
+  filter:
+    drop-shadow(0 0 3px rgba(255,238,150,.95))
+    drop-shadow(0 0 9px rgba(255,126,0,.78))
+    drop-shadow(0 0 18px rgba(239,68,68,.48));
+  animation:
+    heroBreath 2.4s ease-in-out infinite,
+    heroFireGlow 1.05s ease-in-out infinite;
 }
 .hero-fig.combo-active::after {
   content: attr(data-combo-label);
   position: absolute;
-  left: 50%; bottom: calc(100% - 5px);
+  left: 50%; bottom: calc(100% + 2px);
   transform: translateX(-50%) translateY(8px) scale(.88);
-  white-space: nowrap;
-  padding: 5px 12px;
+  width: max-content; max-width: 150px;
+  white-space: normal; text-align: center;
+  padding: 5px 11px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 1000;
-  letter-spacing: .7px;
+  font-size: 11px; font-weight: 1000; line-height: 1.12;
+  letter-spacing: .55px;
   color: #fff;
   background: linear-gradient(135deg, #7c2d12, #dc2626 55%, #f59e0b);
   border: 1px solid rgba(255,255,255,.72);
-  box-shadow: 0 0 12px rgba(249,115,22,.65), 0 0 28px rgba(239,68,68,.35);
+  box-shadow: 0 0 12px rgba(249,115,22,.58), 0 0 22px rgba(239,68,68,.28);
   text-shadow: 0 2px 3px rgba(0,0,0,.45);
   z-index: 8;
   animation: comboLabelIn .42s cubic-bezier(.2,1.45,.35,1) both, comboLabelPulse 1.05s ease-in-out .42s infinite;
   pointer-events: none;
 }
+/* Hindari clipping di tepi arena untuk hero kiri/kanan, terutama LEGENDARY ATTACK. */
+.hero-fig.p.combo-active::after { left: calc(50% + 24px); }
+.hero-fig.e.combo-active::after { left: calc(50% - 24px); }
 .hero-fig.combo-4::before,
 .hero-fig.combo-5::before,
 .hero-fig.combo-6::before {
-  width: 92%; height: 92%;
-  filter: blur(7px);
-  opacity: .95;
+  width: 118%; height: 122%;
+  filter: blur(7px); opacity: .98;
   animation-duration: .72s;
 }
 .hero-fig.combo-4::after,
 .hero-fig.combo-5::after,
 .hero-fig.combo-6::after {
-  font-size: 13px;
-  padding: 6px 14px;
-  box-shadow: 0 0 16px rgba(249,115,22,.85), 0 0 34px rgba(239,68,68,.48);
+  font-size: 12px; padding: 6px 12px; max-width: 156px;
+  box-shadow: 0 0 14px rgba(249,115,22,.72), 0 0 26px rgba(239,68,68,.38);
+}
+@keyframes comboFireAura {
+  0%,100% { opacity: .66; transform: translate(-50%,-50%) scale(.94); filter: blur(6px) brightness(1); }
+  35% { opacity: .92; transform: translate(-50%,-50%) scale(1.04,.98); filter: blur(5px) brightness(1.18); }
+  65% { opacity: .78; transform: translate(-50%,-50%) scale(.98,1.06); filter: blur(7px) brightness(1.08); }
+}
+@keyframes heroFireGlow {
+  0%,100% { filter: drop-shadow(0 0 3px rgba(255,238,150,.85)) drop-shadow(0 0 8px rgba(255,126,0,.62)) drop-shadow(0 0 15px rgba(239,68,68,.36)); }
+  50% { filter: drop-shadow(0 0 5px rgba(255,246,180,1)) drop-shadow(0 0 13px rgba(255,126,0,.92)) drop-shadow(0 0 24px rgba(239,68,68,.58)); }
 }
 .hero-fig.combo-burst::before { animation: comboAuraBurst .55s ease-out; }
 .hero-fig.combo-burst::after { animation: comboLabelBurst .55s cubic-bezier(.2,1.5,.35,1) both; }
