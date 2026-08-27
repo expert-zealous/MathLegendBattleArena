@@ -27,7 +27,7 @@
     let t = '';
     const facesLeft = !!h.flip;           // arah asli gambar
     const wantLeft = side === 'e';        // arah yang dibutuhkan di arena
-    if (facesLeft !== wantLeft) t = ' style="transform:scaleX(-1)"';
+    if (facesLeft !== wantLeft) t = ' style="--hero-flip:scaleX(-1)"';
     return '<img class="hero-img" src="' + h.imgF + '" data-atk="' + (h.imgA || h.imgF) + '" data-idle="' + h.imgF + '"' + t + ' draggable="false">';
   }
 
@@ -622,8 +622,9 @@
         } else code.style.display = 'none';
         live.style.display = (pvp && pvp.role === 'watch') ? '' : 'none';
       }
-      el('b-hero-p').style.borderColor = p.hero.color2;
-      el('b-hero-e').style.borderColor = '#fda4af';
+      // Arena hero dibuat benar-benar tanpa bingkai; warna hero tetap dipakai oleh efek combo.
+      el('b-hero-p').style.removeProperty('border-color');
+      el('b-hero-e').style.removeProperty('border-color');
 
       // pip energy
       ['b-p-energy', 'b-e-energy'].forEach(function (id) {
@@ -671,18 +672,29 @@
       for (let i = 0; i < E1.length; i++) E1[i].classList.toggle('on', i < ee);
     },
     _updCombo: function (side, combo) {
+      // Combo dipindahkan dari header/VS ke atas karakter agar arena lebih bersih.
+      // Badge lama sengaja disembunyikan, tetapi tetap dipelihara untuk kompatibilitas DOM.
       const badge = el(side === 'p' ? 'b-p-combo' : 'b-e-combo');
-      if (combo >= 2) {
-        const label = R.comboLabel(combo);
-        if (badge.textContent !== label) {
-          badge.textContent = label;
-          badge.classList.add('pop');
-          setTimeout(function () { badge.classList.remove('pop'); }, 380);
-        }
-        badge.classList.add('on');
-      } else {
-        badge.classList.remove('on');
+      const fig = el(side === 'p' ? 'b-hero-p' : 'b-hero-e');
+      if (badge) {
+        badge.classList.remove('on', 'pop');
         badge.textContent = '';
+      }
+      if (!fig) return;
+
+      fig.classList.remove('combo-active', 'combo-2', 'combo-3', 'combo-4', 'combo-5', 'combo-6');
+      fig.removeAttribute('data-combo-label');
+      fig.removeAttribute('data-combo-level');
+      if (combo >= 2) {
+        const label = R.comboLabel(combo) || ('COMBO x' + combo);
+        fig.classList.add('combo-active');
+        fig.classList.add('combo-' + Math.min(6, combo));
+        fig.setAttribute('data-combo-label', '🔥 ' + label + ' 🔥');
+        fig.setAttribute('data-combo-level', String(combo));
+        // Re-trigger aura burst setiap combo meningkat.
+        fig.classList.remove('combo-burst');
+        void fig.offsetWidth;
+        fig.classList.add('combo-burst');
       }
     },
     _updShield: function (ps, es) {

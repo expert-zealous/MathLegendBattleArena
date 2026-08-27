@@ -329,13 +329,13 @@ body {
 }
 .hero-fig {
   position: absolute; top: 50%; transform: translateY(-50%);
-  width: 74px; height: 74px; border-radius: 50%;
+  width: 96px; height: 96px;
   display: flex; align-items: center; justify-content: center; font-size: 38px;
-  background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 4px solid #93c5fd;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, .25);
+  background: transparent; border: none; border-radius: 0;
+  box-shadow: none; overflow: visible; z-index: 2;
 }
-.hero-fig.p { left: 12%; }
-.hero-fig.e { right: 12%; background: linear-gradient(135deg, #fff1f2, #ffe4e6); border-color: #fda4af; box-shadow: 0 8px 18px rgba(225, 29, 72, .22); }
+.hero-fig.p { left: 10%; }
+.hero-fig.e { right: 10%; background: transparent; border: none; box-shadow: none; }
 .hero-fig.atk-p { animation: lungeP .38s ease; }
 .hero-fig.atk-e { animation: lungeE .38s ease; }
 .hero-fig.hurt { animation: hurtFlash .38s ease; }
@@ -406,8 +406,98 @@ body {
 }
 @keyframes slashGo { 35% { transform: translate(-50%, -50%) rotate(-38deg) scaleX(1.25); opacity: 1; }
   100% { transform: translate(-50%, -50%) rotate(-38deg) scaleX(1); opacity: 0; } }
-.hero-fig .hero-img { animation: idleFloat 2.8s ease-in-out infinite; }
-@keyframes idleFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+/* Hero arena: tanpa frame + napas halus agar karakter terasa hidup. */
+.hero-fig .hero-img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  animation: heroBreath 2.4s ease-in-out infinite;
+  transform-origin: 50% 88%;
+  will-change: transform, filter;
+  position: relative; z-index: 3;
+  pointer-events: none;
+}
+@keyframes heroBreath {
+  0%, 100% { transform: var(--hero-flip, none) translateY(0) scale(1); }
+  45% { transform: var(--hero-flip, none) translateY(-2px) scale(1.012, .992); }
+  70% { transform: var(--hero-flip, none) translateY(0) scale(1.018, .986); }
+}
+
+/* Aura combo: menyala di sekitar hero yang sedang menyimpan combo. */
+.hero-fig.combo-active::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: 55%;
+  width: 74%; height: 74%;
+  transform: translate(-50%, -50%) scale(.92);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255,247,190,.70) 0%, rgba(255,146,0,.30) 34%, rgba(239,68,68,.18) 58%, transparent 72%);
+  filter: blur(5px);
+  opacity: .78;
+  z-index: 1;
+  animation: comboAura 1s ease-in-out infinite;
+  pointer-events: none;
+}
+.hero-fig.combo-active::after {
+  content: attr(data-combo-label);
+  position: absolute;
+  left: 50%; bottom: calc(100% - 5px);
+  transform: translateX(-50%) translateY(8px) scale(.88);
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .7px;
+  color: #fff;
+  background: linear-gradient(135deg, #7c2d12, #dc2626 55%, #f59e0b);
+  border: 1px solid rgba(255,255,255,.72);
+  box-shadow: 0 0 12px rgba(249,115,22,.65), 0 0 28px rgba(239,68,68,.35);
+  text-shadow: 0 2px 3px rgba(0,0,0,.45);
+  z-index: 8;
+  animation: comboLabelIn .42s cubic-bezier(.2,1.45,.35,1) both, comboLabelPulse 1.05s ease-in-out .42s infinite;
+  pointer-events: none;
+}
+.hero-fig.combo-4::before,
+.hero-fig.combo-5::before,
+.hero-fig.combo-6::before {
+  width: 92%; height: 92%;
+  filter: blur(7px);
+  opacity: .95;
+  animation-duration: .72s;
+}
+.hero-fig.combo-4::after,
+.hero-fig.combo-5::after,
+.hero-fig.combo-6::after {
+  font-size: 13px;
+  padding: 6px 14px;
+  box-shadow: 0 0 16px rgba(249,115,22,.85), 0 0 34px rgba(239,68,68,.48);
+}
+.hero-fig.combo-burst::before { animation: comboAuraBurst .55s ease-out; }
+.hero-fig.combo-burst::after { animation: comboLabelBurst .55s cubic-bezier(.2,1.5,.35,1) both; }
+@keyframes comboAura {
+  0%,100% { opacity: .62; transform: translate(-50%,-50%) scale(.88); }
+  50% { opacity: .95; transform: translate(-50%,-50%) scale(1.08); }
+}
+@keyframes comboAuraBurst {
+  0% { opacity: .15; transform: translate(-50%,-50%) scale(.55); }
+  55% { opacity: 1; transform: translate(-50%,-50%) scale(1.25); }
+  100% { opacity: .82; transform: translate(-50%,-50%) scale(1); }
+}
+@keyframes comboLabelIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(15px) scale(.55) rotate(-4deg); }
+  70% { opacity: 1; transform: translateX(-50%) translateY(-2px) scale(1.08) rotate(1deg); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes comboLabelPulse {
+  0%,100% { filter: brightness(1); }
+  50% { filter: brightness(1.28); }
+}
+@keyframes comboLabelBurst {
+  0% { opacity: 0; transform: translateX(-50%) translateY(18px) scale(.45) rotate(-7deg); }
+  65% { opacity: 1; transform: translateX(-50%) translateY(-5px) scale(1.16) rotate(2deg); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
 
 /* --- confetti kemenangan (elemen sedikit, dibersihkan otomatis) --- */
 .confetti {
@@ -720,20 +810,27 @@ body {
 .intro .logo.intro-logo { font-size: clamp(20px, 6vw, 28px); }
 .link-btn { border: none; background: none; cursor: pointer; font-family: inherit; color: #4f46e5; font-weight: 800; font-size: 12px; padding: 6px; }
 
-/* --- karakter tubuh utuh di arena --- */
+/* --- karakter tubuh utuh di arena: tanpa frame/bingkai --- */
 .hero-fig {
-  width: clamp(58px, 15vw, 84px); aspect-ratio: 3 / 4; height: auto;
-  border-radius: 14px; border: 3px solid #93c5fd;
-  overflow: hidden; top: 50%; transform: translateY(-50%);
+  width: clamp(64px, 16vw, 96px); aspect-ratio: 3 / 4; height: auto;
+  border-radius: 0; border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible;
+  top: 50%; transform: translateY(-50%);
 }
-.hero-fig .hero-img { border-radius: 0; object-fit: cover; animation: none; }
-.hero-fig.p { left: 10%; } .hero-fig.e { right: 10%; border-color: #fda4af; }
+.hero-fig .hero-img {
+  width: 100%; height: 100%;
+  border-radius: 0; object-fit: contain;
+  animation: heroBreath 2.4s ease-in-out infinite;
+}
+.hero-fig.p { left: 10%; } .hero-fig.e { right: 10%; }
 @media (orientation: landscape) and (max-height: 560px) {
-  .hero-fig { width: clamp(48px, 10vw, 64px); }
-  .hero-fig.p { left: 16%; } .hero-fig.e { right: 16%; }
+  .hero-fig { width: clamp(50px, 11vw, 72px); }
+  .hero-fig.p { left: 15%; } .hero-fig.e { right: 15%; }
 }
 @media (orientation: landscape) and (max-height: 430px) {
-  .hero-fig { width: 42px; }
+  .hero-fig { width: 46px; }
 }
 
 /* --- mode wasit --- */
@@ -3826,7 +3923,7 @@ window.ML_FIREBASE_CONFIG = {
     let t = '';
     const facesLeft = !!h.flip;           // arah asli gambar
     const wantLeft = side === 'e';        // arah yang dibutuhkan di arena
-    if (facesLeft !== wantLeft) t = ' style="transform:scaleX(-1)"';
+    if (facesLeft !== wantLeft) t = ' style="--hero-flip:scaleX(-1)"';
     return '<img class="hero-img" src="' + h.imgF + '" data-atk="' + (h.imgA || h.imgF) + '" data-idle="' + h.imgF + '"' + t + ' draggable="false">';
   }
 
@@ -4421,8 +4518,9 @@ window.ML_FIREBASE_CONFIG = {
         } else code.style.display = 'none';
         live.style.display = (pvp && pvp.role === 'watch') ? '' : 'none';
       }
-      el('b-hero-p').style.borderColor = p.hero.color2;
-      el('b-hero-e').style.borderColor = '#fda4af';
+      // Arena hero dibuat benar-benar tanpa bingkai; warna hero tetap dipakai oleh efek combo.
+      el('b-hero-p').style.removeProperty('border-color');
+      el('b-hero-e').style.removeProperty('border-color');
 
       // pip energy
       ['b-p-energy', 'b-e-energy'].forEach(function (id) {
@@ -4470,18 +4568,29 @@ window.ML_FIREBASE_CONFIG = {
       for (let i = 0; i < E1.length; i++) E1[i].classList.toggle('on', i < ee);
     },
     _updCombo: function (side, combo) {
+      // Combo dipindahkan dari header/VS ke atas karakter agar arena lebih bersih.
+      // Badge lama sengaja disembunyikan, tetapi tetap dipelihara untuk kompatibilitas DOM.
       const badge = el(side === 'p' ? 'b-p-combo' : 'b-e-combo');
-      if (combo >= 2) {
-        const label = R.comboLabel(combo);
-        if (badge.textContent !== label) {
-          badge.textContent = label;
-          badge.classList.add('pop');
-          setTimeout(function () { badge.classList.remove('pop'); }, 380);
-        }
-        badge.classList.add('on');
-      } else {
-        badge.classList.remove('on');
+      const fig = el(side === 'p' ? 'b-hero-p' : 'b-hero-e');
+      if (badge) {
+        badge.classList.remove('on', 'pop');
         badge.textContent = '';
+      }
+      if (!fig) return;
+
+      fig.classList.remove('combo-active', 'combo-2', 'combo-3', 'combo-4', 'combo-5', 'combo-6');
+      fig.removeAttribute('data-combo-label');
+      fig.removeAttribute('data-combo-level');
+      if (combo >= 2) {
+        const label = R.comboLabel(combo) || ('COMBO x' + combo);
+        fig.classList.add('combo-active');
+        fig.classList.add('combo-' + Math.min(6, combo));
+        fig.setAttribute('data-combo-label', '🔥 ' + label + ' 🔥');
+        fig.setAttribute('data-combo-level', String(combo));
+        // Re-trigger aura burst setiap combo meningkat.
+        fig.classList.remove('combo-burst');
+        void fig.offsetWidth;
+        fig.classList.add('combo-burst');
       }
     },
     _updShield: function (ps, es) {
