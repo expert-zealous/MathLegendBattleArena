@@ -1,6 +1,6 @@
 {
   "name": "MATH LEGENDS: BATTLE ARENA",
-  "short_name": "Math Legends",
+  "short_name": "MLBA",
   "description": "Game edukasi matematika kompetitif SMP/SMA",
   "start_url": "./index.html",
   "display": "standalone",
