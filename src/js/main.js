@@ -22,6 +22,8 @@
     App.lastResult = res;
     if (keepCfg) App.lastCfg = keepCfg; else App.lastCfg = null;
     setTimeout(function () {
+      if (!keepCfg) res.online = true;
+      else res.online = false;
       const sum = P.applyMatchResult(res);
       if (ML.Backend && ML.Backend.online) ML.Backend.onMatchEnd(P.data); // cloud save + leaderboard
       if (App.battle === engine) {
@@ -56,7 +58,8 @@
       roomId: info.roomId,
       myHeroId: P.data.hero,
       myName: P.data.name || 'PEMAIN',
-      myGear: P.computeGear(),
+      myGear: P.computeGear(P.data.hero),
+      myLevel: ML.Rules.levelFromXP(P.data.xp).level,
       opp: info.opp
     });
     App.battle = net;
@@ -164,7 +167,8 @@
           heroId: s.heroId,
           aiHeroId: D.heroes[U.ri(0, D.heroes.length - 1)].id,
           aiLevelIdx: s.aiIdx,
-          playerGear: P.computeGear(),
+          playerGear: P.computeGear(s.heroId),
+          playerLevel: ML.Rules.levelFromXP(P.data.xp).level,
           enemyGear: { hpMul: 0.03 * s.aiIdx, atkMul: 0.02 * s.aiIdx, critAdd: 0.01 * s.aiIdx, defAdd: s.aiIdx >= 2 ? 1 : 0 },
           topicFocus: s.mode === 'practice' ? s.topic : null,
           practice: s.mode === 'practice',
@@ -178,7 +182,7 @@
         if (!Bc || !Bc.online || !Bc._fb || !Bc.user) { UI.toast('ℹ️ Mode online belum aktif'); break; }
         AU.play('skill');
         let handle = null;
-        const me = { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() };
+        const me = { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) };
         try {
           const code = ML.PVP.makeCode();      // kode dibuat SEBELUM modal -> selalu tampil
           UI.roomModal(code, function () { if (handle) handle.cancel(); });
@@ -209,7 +213,7 @@
         UI.inputModal('🔑 Gabung Ruangan', 'Masukkan kode 5 karakter dari pembuat ruangan.', 'KODE', 'GABUNG ⚔️', function (code) {
           let handle = null;
           UI.searchingModal(function () { if (handle) handle.cancel(); });
-          handle = ML.PVP.joinRoom(Bj._fb, { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() }, code,
+          handle = ML.PVP.joinRoom(Bj._fb, { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) }, code,
             function (info) { UI.closeModal(); startNetBattle(info); },
             function (err) {
               UI.closeModal();
@@ -239,7 +243,7 @@
         UI.searchingModal(function () { if (handle) handle.cancel(); });
         handle = ML.PVP.findMatch(
           B._fb,
-          { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, gear: P.computeGear() },
+          { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) },
           function (info) { UI.closeModal(); startNetBattle(info); },
           function (err) {
             UI.closeModal();
@@ -255,6 +259,15 @@
         const i = parseInt(t.getAttribute('data-i'), 10);
         UI.B.lastPick = i;
         battle.playerAnswer(i);
+        break;
+      }
+
+      case 'choose-difficulty': {
+        const battle = App.battle;
+        if (!battle) return;
+        const d = parseInt(t.getAttribute('data-diff'), 10) || 2;
+        if (battle.chooseDifficulty) battle.chooseDifficulty(d);
+        if (UI.showDifficultyChoice) UI.showDifficultyChoice(d);
         break;
       }
 
@@ -284,8 +297,10 @@
           heroId: P.data.hero,
           aiHeroId: D.heroes[U.ri(0, D.heroes.length - 1)].id,
           aiLevelIdx: 1,
-          playerGear: P.computeGear(),
+          playerGear: P.computeGear(s.heroId),
+          playerLevel: ML.Rules.levelFromXP(P.data.xp).level,
           enemyGear: null,
+          playerLevel: ML.Rules.levelFromXP(P.data.xp).level,
           topicFocus: t.getAttribute('data-topic'),
           practice: true,
           playerName: P.data.name
@@ -340,9 +355,20 @@
         });
         break;
 
+      case 'shop-hero': {
+        const id = t.getAttribute('data-id');
+        if (D.heroes.some(function (h) { return h.id === id; })) {
+          P.data.hero = id; P.save();
+          ML.App.setup.heroId = id;
+          UI.renderShop();
+          UI.renderHome();
+        }
+        break;
+      }
+
       case 'buy-gear': {
         const id = t.getAttribute('data-id');
-        const r = P.buyGear(id);
+        const r = P.buyGear(id, P.data.hero);
         AU.play(r.ok ? 'coin' : 'wrong');
         UI.toast(r.ok ? '🎉 ' + r.msg : '⚠️ ' + r.msg, r.ok);
         UI.renderShop();
@@ -387,7 +413,7 @@
       return;
     }
     const act = t.getAttribute('data-act');
-    if (act === 'answer' || act === 'use-skill') {
+    if (act === 'answer' || act === 'use-skill' || act === 'choose-difficulty') {
       onAction(act, t); // tanpa bunyi klik (ada bunyi sendiri)
       return;
     }

@@ -501,7 +501,7 @@
       rows += '<div class="rw-row"><span>\ud83e\ude99 Coin</span><b class="up">+' + sum.coins + '</b></div>';
       if (sum.levelBonus > 0) rows += '<div class="rw-row"><span>\ud83c\udfc5 Bonus Level (' + sum.level + ')</span><b class="up">+' + sum.levelBonus + '</b></div>';
       if (sum.diamonds > 0) rows += '<div class="rw-row"><span>💎 Diamond</span><b class="up">+' + sum.diamonds + '</b></div>';
-      if (!res.practice) {
+      if (res.online) {
         rows += '<div class="rw-row"><span>' + sum.rankAfter.icon + ' ' + sum.rankAfter.name + '</span>' +
           '<b class="' + (sum.rpDelta >= 0 ? 'up' : 'down') + '">' + (sum.rpDelta >= 0 ? '+' : '') + sum.rpDelta + ' RP</b></div>';
         rows += '<div class="rw-row"><span>🧠 Math Rating</span><b class="' + (sum.mrDelta >= 0 ? 'up' : 'down') + '">' + (sum.mrDelta >= 0 ? '+' : '') + sum.mrDelta + '</b></div>';
@@ -653,6 +653,7 @@
       this._updCombo('p', 0); this._updCombo('e', 0);
       this._updShield(p.shield, e.shield);
       this._updSkillBtn();
+      this._updDifficultySkills();
 
       const on = function (ev, fn) { B.offs.push(engine.on(ev, fn)); };
 
@@ -661,6 +662,7 @@
       on('answered', function (d) { self._onAnswered(d); });
       on('attack', function (d) { self._onAttack(d); });
       on('skill', function (d) { self._onSkill(d); });
+      on('difficulty', function (d) { self.showDifficultyChoice(d.difficulty); });
     },
 
     detachBattle: function () {
@@ -724,6 +726,22 @@
       btn.disabled = f.energy < sk.cost || (sk.id === 'shield' && f.shield > 0);
     },
 
+    showDifficultyChoice: function (d) {
+      const buttons = U.$$('#b-difficulty-skills .diff-skill');
+      buttons.forEach(function (b) { b.classList.toggle('selected', Number(b.getAttribute('data-diff')) === Number(d)); });
+      const label = R.DIFF_LABEL[d] || 'SEDANG';
+      const hint = el('skill-hint');
+      if (hint) hint.textContent = 'Soal ' + label + ' siap • pilih bebas kapan saja';
+    },
+
+    _updDifficultySkills: function () {
+      const engine = this.B.engine;
+      const buttons = U.$$('#b-difficulty-skills .diff-skill');
+      if (!buttons.length) return;
+      const locked = !engine || engine.role === 'watch';
+      buttons.forEach(function (b) { b.disabled = !!locked; });
+    },
+
     _onQuestion: function (d) {
       const q = d.q;
       const t = D.topics.find(function (x) { return x.id === q.topic; }) || D.topics[0];
@@ -745,7 +763,7 @@
       const fb = el('q-feedback');
       fb.textContent = '';
       fb.className = 'q-feedback';
-      el('b-round').textContent = d.round + '/' + d.maxRounds;
+      el('b-round').textContent = d.parallel ? ('SOAL #' + d.round) : (d.round + '/' + d.maxRounds);
       el('b-e-status').textContent = '🤔 AI berpikir…';
       const bar = el('q-timerbar');
       bar.style.width = '100%';
@@ -755,6 +773,7 @@
       el('q-time').textContent = Math.ceil(d.limit || ML.Rules.Q_TIME);
       this._updEnergy(d.pEnergy, d.eEnergy);
       this._updSkillBtn();
+      this._updDifficultySkills();
       this._updShield(this.B.engine.p.shield, this.B.engine.e.shield);
     },
 
@@ -799,9 +818,9 @@
           AU.play('wrong');
         }
       } else {
-        el('b-e-status').textContent = d.correct
-          ? '✔️ AI benar (' + d.timeUsed + 's)'
-          : (d.grade === 'TIME' ? '⏰ AI kehabisan waktu' : '❌ AI salah');
+        el('b-e-status').textContent = engine.cfgPvp
+          ? (d.correct ? '⚔️ Lawan menyerang' : (d.grade === 'TIME' ? '⏰ Lawan kehabisan waktu' : '❌ Lawan salah'))
+          : (d.correct ? '✔️ AI benar (' + d.timeUsed + 's)' : (d.grade === 'TIME' ? '⏰ AI kehabisan waktu' : '❌ AI salah'));
       }
 
       this._updEnergy(engine.p.energy, engine.e.energy);

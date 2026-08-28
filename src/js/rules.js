@@ -23,7 +23,8 @@
     Q_TIME: 10,        // fallback (soal tanpa kesulitan)
     MAX_ROUNDS: 20,    // batas ronde; sisa HP menentukan pemenang
     MAX_ENERGY: 10,
-    START_ENERGY: 2,   // modal awal agar strategi skill terbuka lebih cepat
+    START_ENERGY: 2,
+    LEVEL_HP_BONUS: 2, // +2 HP permanen setiap level akun,   // modal awal agar strategi skill terbuka lebih cepat
 
     DIFF_LABEL: ['', 'MUDAH', 'SEDANG', 'SULIT', 'MAHIR', 'LEGENDA'],
     DIFF_COLOR: ['', '#22c55e', '#84cc16', '#f59e0b', '#f97316', '#ef4444'],
@@ -62,10 +63,15 @@
     /* ---------- Rank (kemampuan kompetitif, dari Rank Points) ---------- */
     rankFromRP: function (rp) {
       const D = ML.DATA.ranks;
-      let i = D.length - 1;
-      while (i > 0 && rp < D[i].rp) i--;
-      const cur = rp - D[i].rp;
-      return { index: i, name: D[i].name, icon: D[i].icon, color: D[i].color, cur: cur, need: ML.DATA.RP_PER_TIER };
+      const per = ML.DATA.RP_PER_TIER || 100;
+      const total = D.length * 5;
+      const safe = U.clamp(Math.floor(Number(rp) || 0), 0, total * per - 1);
+      const tier = Math.floor(safe / per);
+      const index = Math.min(D.length - 1, Math.floor(tier / 5));
+      const subIndex = tier % 5;
+      const division = 5 - subIndex;
+      const cur = safe % per;
+      return { index: index, tier: tier, division: division, name: D[index].name + ' ' + division, majorName: D[index].name, icon: D[index].icon, color: D[index].color, cur: cur, need: per };
     },
 
     /* ---------- Math Rating (Elo) ---------- */
@@ -93,20 +99,18 @@
 
     /* ---------- Reward match (jelas & transparan, tanpa gambling) ---------- */
     rewardsForMatch: function (r) {
+      // AI/latihan = XP + coin saja. Diamond dan RP hanya dari pertandingan Online.
       let coins = (r.win ? 35 : 15) + r.correct;
       let diamonds = 0;
-      if (r.win && !r.practice) {
-        if (r.aiLevelIdx === 3) diamonds += 5;
-        else if (r.aiLevelIdx === 2) diamonds += 3;
-      }
-      if (r.perfect >= 8) diamonds += 2;
+      if (r.online && r.win) diamonds += 3;
+      if (r.online && r.perfect >= 8) diamonds += 2;
       return { coins: coins, diamonds: diamonds };
     },
 
     /* ---------- Perubahan Rank Points: menang dihitung dari performa,
        bukan sekadar rajin bermain. Kalah tidak turun terlalu dalam. ---------- */
     rpDelta: function (r) {
-      if (r.practice) return 0;
+      if (!r.online) return 0;
       const ai = ML.DATA.aiLevels[r.aiLevelIdx] || ML.DATA.aiLevels[1];
       if (r.win) {
         const f = 0.5 + r.accuracy * 0.5; // 0.5 .. 1.0

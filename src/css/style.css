@@ -939,3 +939,24 @@ body {
   .combo-float.p { left:calc(15% + 23px - 53px); }
   .combo-float.e { right:calc(15% + 23px - 53px); }
 }
+
+/* v0.9 — skill serangan berdasarkan tingkat soal */
+.difficulty-skills { display:flex; gap:6px; align-items:stretch; flex-wrap:wrap; }
+.diff-skill { border:2px solid #e2e8f0; background:#fff; border-radius:12px; padding:7px 9px; min-width:78px; cursor:pointer; font-family:inherit; color:#334155; line-height:1.05; transition:transform .08s,border-color .15s,box-shadow .15s; }
+.diff-skill b { display:block; font-size:10px; }
+.diff-skill span { display:block; font-size:9px; font-weight:900; margin-top:3px; }
+.diff-skill.selected { border-color:#4f46e5; box-shadow:0 0 0 2px rgba(79,70,229,.12); transform:translateY(-1px); }
+.diff-skill:active { transform:scale(.97); }
+.diff-skill:disabled { opacity:.45; cursor:default; }
+.skillbar { align-items:center; flex-wrap:wrap; }
+.shop-hero-row { display:flex; gap:7px; overflow-x:auto; padding:2px 1px 10px; margin-bottom:2px; }
+.shop-hero { flex:0 0 auto; width:72px; border:2px solid #e2e8f0; background:#fff; border-radius:13px; padding:5px; cursor:pointer; font-family:inherit; }
+.shop-hero.active { border-color:#4f46e5; box-shadow:0 0 0 2px rgba(79,70,229,.12); }
+.shop-hero .hero-img { width:46px; height:46px; object-fit:contain; border:0 !important; border-radius:0 !important; background:transparent !important; }
+.shop-hero b { display:block; font-size:9px; margin-top:2px; }
+@media (max-width:760px) {
+  .difficulty-skills { width:100%; order:1; }
+  .diff-skill { flex:1; min-width:0; padding:6px 5px; }
+  .skill-btn { order:2; }
+  .skill-hint { order:3; width:100%; }
+}

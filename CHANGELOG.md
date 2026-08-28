@@ -236,3 +236,11 @@ Ambang PERFECT/WEAK proporsional (30%/80% batas) — cepat tetap dihargai, tapi 
 ## v0.3.0 — Rilis awal
 
 3 hero (RAKA/LYRA/SENA), battle vs AI 4 level, question engine adaptif 4 topik (operasi bilangan, aljabar, pecahan, persen), combo, critical, comeback, timer, XP/level/rank BRONZE→LEGEND + Math Rating (Elo), misi harian, 10 achievement, leaderboard lokal, mode latihan per materi, statistik diagnostik + rekomendasi belajar, audio sintesis, simpan otomatis localStorage, responsif portrait/landscape.
+
+
+## V16 — PvP Free-Flow Question Skills
+- Skill 1/2/3 now map to preloaded independent Easy/Medium/Hard question lanes.
+- Host and Guest can answer independently; no waiting for opponent.
+- Each used skill lane is immediately refilled with a different question.
+- Online match ends only when a player's HP reaches zero (or surrender/connection end).
+- AI/local battle turn system remains unchanged.

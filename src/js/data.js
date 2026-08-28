@@ -9,7 +9,7 @@
   const U = ML.util;
 
   ML.DATA = {
-    version: '0.8.4',
+    version: '0.9.0',
 
     /* ---------- HERO (5 hero, identitas original; gambar karakter di folder assets) ---------- */
     heroes: [
@@ -97,7 +97,7 @@
       { name: 'LEGEND',       icon: '🌟', color: '#f59e0b', rp: 700 }
     ],
     RP_PER_TIER: 100,
-    RP_MAX: 799, // LEGEND penuh
+    RP_MAX: 3999, // 8 rank utama × 5 divisi × 100 RP - 1
 
     /* ---------- TOPIK MATEMATIKA (fase prototype) ---------- */
     topics: [

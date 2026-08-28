@@ -30,6 +30,7 @@
       this.ai = new ML.AI(this.e.hero, ML.DATA.aiLevels[cfg.aiLevelIdx != null ? cfg.aiLevelIdx : 1]);
       this.round = 0;
       this.maxRounds = R.MAX_ROUNDS;
+      this.nextDifficulty = cfg.startDifficulty || 2;
       this.finished = false;
       this.q = null;
       this.usedQ = new Set();
@@ -38,11 +39,19 @@
       this._interval = null;
       this._aiT = null;
       this._timers = [];
+      // Mode AI bebas-giliran: pemain dan AI memiliki soal + timer masing-masing.
+      this._freeFlow = !cfg.netMode;
+      this._ffState = { p: null, e: null };
+      this._ffTimers = { p: null, e: null };
+      this._ffSeq = { p: 0, e: 0 };
+      this._ffUsed = new Set();
+      this._ffSlots = { p: {1: [], 2: [], 3: []}, e: {1: [], 2: [], 3: []} };
     }
 
     _fighter(hero, isPlayer, gear) {
       const g = gear || {};
-      const hp = Math.round(hero.hp * (1 + (g.hpMul || 0)));
+      const levelHp = isPlayer ? Math.max(0, ((this.cfg.playerLevel || 1) - 1) * (R.LEVEL_HP_BONUS || 0)) : Math.max(0, ((this.cfg.enemyLevel || 1) - 1) * (R.LEVEL_HP_BONUS || 0));
+      const hp = Math.round(hero.hp * (1 + (g.hpMul || 0))) + levelHp;
       return {
         hero: hero, isPlayer: isPlayer,
         gearCrit: g.critAdd || 0,
@@ -65,7 +74,98 @@
     /* ---------- siklus pertandingan ---------- */
     start() {
       this.emit('start', { p: this.p, e: this.e, cfg: this.cfg });
+      if (this._freeFlow) { this._startFreeFlow(); return; }
       this._next();
+    }
+
+    _makeFreeFlowQuestion(diff) {
+      const topic = U.pick(this.topicPool);
+      let q = null;
+      try { q = ML.QEngine.make(topic, diff, this._ffUsed); } catch (e) { q = null; }
+      if (!q) { try { q = ML.QEngine.make('arit', diff, this._ffUsed); } catch (e) { q = null; } }
+      return q;
+    }
+
+    _startFreeFlow() {
+      const self = this;
+      [1,2,3].forEach(function(d) {
+        self._ffSlots.p[d].push(self._makeFreeFlowQuestion(d));
+        self._ffSlots.e[d].push(self._makeFreeFlowQuestion(d));
+      });
+      this.round = 0;
+      this._issueFreeFlowQuestion('p', 2);
+      this._issueFreeFlowQuestion('e', 1 + Math.floor(Math.random() * 3));
+    }
+
+    _issueFreeFlowQuestion(side, diff) {
+      if (this.finished) return false;
+      diff = U.clamp(Math.round(diff) || 2, 1, 3);
+      const slot = this._ffSlots[side][diff];
+      let q = slot.shift();
+      if (!q) q = this._makeFreeFlowQuestion(diff);
+      const refill = this._makeFreeFlowQuestion(diff);
+      if (refill) slot.push(refill);
+      if (!q) return false;
+      const seq = ++this._ffSeq[side];
+      const limit = R.timeForDiff(q.difficulty);
+      const state = { q:q, diff:diff, seq:seq, answered:false, startedAt:Date.now(), limit:limit };
+      this._ffState[side] = state;
+      if (side === 'p') {
+        this.round = Math.max(this.round, seq);
+        this.q = q;
+        this.p.answered = false;
+        this.qStart = state.startedAt;
+        this.qLimit = limit;
+        this._startFreeFlowPlayerTimer(state);
+        this.emit('question', { q:q, round:seq, maxRounds:999, limit:limit, pEnergy:this.p.energy, eEnergy:this.e.energy, parallel:true, side:'p' });
+      } else {
+        this.e.answered = false;
+        this._startFreeFlowAITimer(state);
+      }
+      return true;
+    }
+
+    _startFreeFlowPlayerTimer(state) {
+      const self=this;
+      if (this._ffTimers.p) clearInterval(this._ffTimers.p);
+      this._ffTimers.p=setInterval(function(){
+        if (self.finished || self._ffState.p !== state || state.answered) { clearInterval(self._ffTimers.p); self._ffTimers.p=null; return; }
+        const left=Math.max(0,state.limit-(Date.now()-state.startedAt)/1000);
+        self.emit('timer',{left:left,total:state.limit});
+        if(left<=0){ clearInterval(self._ffTimers.p); self._ffTimers.p=null; self._answerFreeFlow('p',-1,state.limit,state); }
+      },100);
+    }
+
+    _startFreeFlowAITimer(state) {
+      const self=this;
+      if (this._ffTimers.e) clearTimeout(this._ffTimers.e);
+      this.ai.comeback = this.e.hp / this.e.maxHp < 0.3;
+      const plan = this.ai.plan(state.q);
+      state.plan = plan;
+      const delay = Math.min(plan.time, state.limit);
+      this._ffTimers.e=setTimeout(function(){
+        if(self.finished || self._ffState.e !== state || state.answered) return;
+        self._answerFreeFlow('e', plan.correct ? state.q.answerIndex : -1, delay, state);
+      }, Math.max(300, delay*1000));
+    }
+
+    _answerFreeFlow(side,index,timeUsed,state) {
+      if (this.finished || !state || state.answered || this._ffState[side] !== state) return false;
+      state.answered=true;
+      if(side==='p' && this._ffTimers.p){clearInterval(this._ffTimers.p);this._ffTimers.p=null;}
+      if(side==='e' && this._ffTimers.e){clearTimeout(this._ffTimers.e);this._ffTimers.e=null;}
+      this.q=state.q; this.qStart=state.startedAt; this.qLimit=state.limit;
+      const f=side==='p'?this.p:this.e, def=side==='p'?this.e:this.p;
+      f.answered=true;
+      f.answerTime=U.clamp(Number(timeUsed)||state.limit,0,state.limit);
+      const ok=index===state.q.answerIndex;
+      this._applyResult(f,def,ok,f.answerTime,side==='p'?'P':'AI');
+      if(this.finished) return true;
+      // AI segera memilih soal berikutnya; pemain memilih sendiri lewat Skill 1/2/3.
+      if(side==='e') {
+        this._issueFreeFlowQuestion('e',1+Math.floor(Math.random()*3));
+      }
+      return true;
     }
 
     _next() {
@@ -73,7 +173,8 @@
       this.round++;
       if (this.round > this.maxRounds) { this._finish(this._leader(), 'ROUNDS'); return; }
 
-      const diff = U.clamp(this.p.diff, 1, 5);
+      const diff = this.nextDifficulty != null ? U.clamp(this.nextDifficulty, 1, 3) : U.clamp(this.p.diff, 1, 5);
+      this.nextDifficulty = null;
       const topic = U.pick(this.topicPool);
       let q = null;
       try { q = ML.QEngine.make(topic, diff, this.usedQ); } catch (e) { q = null; }
@@ -107,6 +208,23 @@
       this._tick();
     }
 
+    /* ---------- pilihan skill serangan: tingkat soal ronde berikutnya ---------- */
+    chooseDifficulty(diff) {
+      if (this.finished) return false;
+      const d = U.clamp(Math.round(diff) || 2, 1, 3);
+      if (this._freeFlow) {
+        // Klik skill langsung mengganti soal aktif dengan soal baru dari jalur skill tersebut.
+        if (this._ffTimers.p) { clearInterval(this._ffTimers.p); this._ffTimers.p=null; }
+        if (this._ffState.p && !this._ffState.p.answered) this._ffState.p.answered=true;
+        const ok = this._issueFreeFlowQuestion('p', d);
+        this.emit('difficulty', { difficulty:d, immediate:true, parallel:true });
+        return ok;
+      }
+      this.nextDifficulty = d;
+      this.emit('difficulty', { difficulty: d, next: true });
+      return true;
+    }
+
     /* ---------- PvP: jawaban dari jaringan (host yang menjalankan engine) ---------- */
     netAnswer(side, index, timeUsed) {
       if (this.finished || !this.q) return;
@@ -117,7 +235,8 @@
       f.answerTime = U.clamp(timeUsed != null ? timeUsed : this.qLimit, 0, this.qLimit);
       const ok = index === this.q.answerIndex;
       this._applyResult(f, isP ? this.e : this.p, ok, f.answerTime, 'NET');
-      if (this.p.answered && this.e.answered) this._endRound();
+      // PvP bebas giliran: masing-masing pemain memiliki soal dan timer sendiri.
+      // Jangan menunggu lawan menjawab sebelum pemain dapat memilih soal berikutnya.
     }
 
     /* ---------- PvP: skill kedua sisi (dipanggil host) ---------- */
@@ -181,6 +300,13 @@
     }
 
     playerAnswer(i) {
+      if (this._freeFlow) {
+        const st=this._ffState.p;
+        if (!st || st.answered || this.finished) return;
+        const used=Math.min((Date.now()-st.startedAt)/1000,st.limit);
+        this._answerFreeFlow('p',i,used,st);
+        return;
+      }
       if (this.finished || this.p.answered || !this.q) return;
       this.p.answered = true;
       const used = Math.min((Date.now() - this.qStart) / 1000, this.qLimit);
@@ -420,6 +546,8 @@
     _clearQ() {
       if (this._interval) { clearInterval(this._interval); this._interval = null; }
       if (this._aiT) { clearTimeout(this._aiT); this._aiT = null; }
+      if (this._ffTimers.p) { clearInterval(this._ffTimers.p); this._ffTimers.p = null; }
+      if (this._ffTimers.e) { clearTimeout(this._ffTimers.e); this._ffTimers.e = null; }
     }
 
     _after(ms, fn) {
@@ -482,7 +610,7 @@
       return {
         win: winner === 'p', draw: winner === null,
         reason: reason,
-        ranked: !this.cfg.practice, practice: !!this.cfg.practice,
+        ranked: !!this.cfg.netMode, online: !!this.cfg.netMode, practice: !!this.cfg.practice,
         aiLevelIdx: this.cfg.aiLevelIdx != null ? this.cfg.aiLevelIdx : 1,
         aiHero: this.e.hero.id, hero: this.p.hero.id,
         playerName: this.cfg.playerName || '',

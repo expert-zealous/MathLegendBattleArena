@@ -84,7 +84,7 @@
         try {
           await fs.setDoc(myRef, _clean({
             uid: uid, name: (me.name || 'PEMAIN').slice(0, 12), hero: me.hero || 'raka',
-            mr: isFinite(me.mr) ? me.mr : 1000, gear: me.gear || null,
+            mr: isFinite(me.mr) ? me.mr : 1000, level: me.level || 1, gear: me.gear || null,
             matched: false, opponent: null, updatedAt: Date.now()
           }));
         } catch (e) { /* abaikan: dok lama tak masalah */ }
@@ -131,12 +131,12 @@
               await fs.updateDoc(hostRef, _clean({
                 matched: true, opponent: uid,
                 oppName: (me.name || 'PEMAIN').slice(0, 12), oppHero: me.hero || 'raka',
-                oppMr: isFinite(me.mr) ? me.mr : 1000, oppGear: me.gear || null
+                oppMr: isFinite(me.mr) ? me.mr : 1000, oppLevel: me.level || 1, oppGear: me.gear || null
               }));
             } catch (e) { await sleep(400); continue; }
             const hostSnap = await fs.getDoc(hostRef).catch(function () { return null; });
             const hd = hostSnap && hostSnap.exists() ? hostSnap.data() : null;
-            const opp = { uid: res.hostUid, name: (hd && hd.name) || 'HOST', hero: (hd && hd.hero) || 'raka', mr: (hd && hd.mr) || 1000, gear: (hd && hd.gear) || null };
+            const opp = { uid: res.hostUid, name: (hd && hd.name) || 'HOST', hero: (hd && hd.hero) || 'raka', mr: (hd && hd.mr) || 1000, level: (hd && hd.level) || 1, gear: (hd && hd.gear) || null };
             // tunggu host membuat ruangan
             const ok = await new Promise(function (resolve) {
               let tries = 0;
@@ -173,7 +173,7 @@
             });
             if (done || cancelled) return;
             if (got) {
-              const opp = { uid: got.opponent, name: got.oppName || 'GUEST', hero: got.oppHero || 'raka', mr: got.oppMr || 1000, gear: got.oppGear || null };
+              const opp = { uid: got.opponent, name: got.oppName || 'GUEST', hero: got.oppHero || 'raka', mr: got.oppMr || 1000, level: got.oppLevel || 1, gear: got.oppGear || null };
               const guestSnap = await fs.getDoc(fs.doc(db, 'matchmaking', opp.uid)).catch(function () { return null; });
               if (guestSnap && guestSnap.exists()) {
                 const gd = guestSnap.data();
@@ -266,6 +266,7 @@
         name: d.guestName || (d.names && d.names.guest) || 'GUEST',
         hero: d.guestHero || (d.heroes && d.heroes.guest) || 'raka',
         mr: d.guestMr || 1000,
+        level: d.guestLevel || 1,
         gear: d.guestGear || null
       };
       if (G.console) console.log('[ML PVP HOST] GUEST CONFIRMED', code, opp.uid);
@@ -299,7 +300,7 @@
           startBattleIfJoined({
             status:'playing', guest:guestUid, guestUid:guestUid,
             guestName:mm.oppName || d.guestName, guestHero:mm.oppHero || d.guestHero,
-            guestMr:mm.oppMr || d.guestMr, guestGear:mm.oppGear || d.guestGear
+            guestMr:mm.oppMr || d.guestMr, guestLevel:mm.oppLevel || d.guestLevel || 1, guestGear:mm.oppGear || d.guestGear
           });
         });
       }).catch(function(e){
@@ -309,15 +310,15 @@
 
     fs.setDoc(mmRef, _clean({
       uid:uid, name:(me.name || 'PEMAIN').slice(0,12), hero:me.hero || 'raka',
-      mr:isFinite(me.mr) ? me.mr : 1000, gear:me.gear || null,
+      mr:isFinite(me.mr) ? me.mr : 1000, level:me.level || 1, gear:me.gear || null,
       matched:false, opponent:null, updatedAt:Date.now()
     }), {merge:true}).catch(function(){});
 
     fs.setDoc(roomRef, _clean({
       status:'waiting', host:uid,
       hostName:(me.name || 'PEMAIN').slice(0,12), hostHero:me.hero || 'raka',
-      hostMr:isFinite(me.mr) ? me.mr : 1000, hostGear:me.gear || null,
-      guest:null, guestUid:null, guestName:null, guestHero:null, guestMr:null, guestGear:null,
+      hostMr:isFinite(me.mr) ? me.mr : 1000, hostLevel:me.level || 1, hostGear:me.gear || null,
+      guest:null, guestUid:null, guestName:null, guestHero:null, guestMr:null, guestLevel:null, guestGear:null,
       createdAt:Date.now(), updatedAt:Date.now()
     })).then(function(){
       if (onState) onState('waiting');
@@ -398,11 +399,11 @@
       if (d.status !== 'waiting') throw new Error('FULL');
       if (d.host === uid) throw new Error('SELF');
       if (d.guest || d.guestUid) throw new Error('FULL');
-      opp = {uid:d.host, name:d.hostName || 'HOST', hero:d.hostHero || 'raka', mr:d.hostMr || 1000, gear:d.hostGear || null};
+      opp = {uid:d.host, name:d.hostName || 'HOST', hero:d.hostHero || 'raka', mr:d.hostMr || 1000, level:d.hostLevel || 1, gear:d.hostGear || null};
       const guestData = _clean({
         guest:uid, guestUid:uid,
         guestName:(me.name || 'PEMAIN').slice(0,12), guestHero:me.hero || 'raka',
-        guestMr:isFinite(me.mr) ? me.mr : 1000, guestGear:me.gear || null,
+        guestMr:isFinite(me.mr) ? me.mr : 1000, guestLevel:me.level || 1, guestGear:me.gear || null,
         updatedAt:Date.now()
       });
       // Write guest presence to the room.
@@ -456,6 +457,7 @@
       this._flushT = null;
       this._processedAnsRound = -1;
       this._skillReqSent = false;
+      this._difficultyReqSent = false;
       this._mySide = cfg.role === 'host' ? 'p' : 'e'; // sisi engine (host selalu 'p')
 
       if (cfg.role === 'host') this._initHost();
@@ -467,168 +469,232 @@
       return ML.DATA.heroes.find(function (h) { return h.id === id; }) || ML.DATA.heroes[0];
     }
 
-    /* ---------- HOST: engine sungguhan + siaran ---------- */
+    /* ---------- HOST: PvP bebas giliran (soal independen per pemain) ---------- */
     _initHost() {
       const cfg = this.cfgPvp;
       const battle = new ML.Battle({
-        heroId: cfg.myHeroId,
-        aiHeroId: cfg.opp.hero,
-        aiLevelIdx: 2, // padanan RP utk PvP
+        heroId: cfg.myHeroId, aiHeroId: cfg.opp.hero, aiLevelIdx: 2,
         netMode: true, practice: false,
         playerGear: cfg.myGear || null, enemyGear: cfg.opp.gear || null,
-        playerName: cfg.myName, oppName: cfg.opp.name,
-        oppRating: cfg.opp.mr || 1000
+        playerLevel: cfg.myLevel || 1, enemyLevel: cfg.opp.level || 1,
+        playerName: cfg.myName, oppName: cfg.opp.name, oppRating: cfg.opp.mr || 1000
       });
       this.battle = battle;
-      this.p = battle.p; this.e = battle.e;
-      this.cfg = battle.cfg;
-      this.q = null;
-      // UI membaca nama lawan dari sini
+      this.p = battle.p; this.e = battle.e; this.cfg = battle.cfg;
       this.ai = { level: { bot: cfg.opp.name } };
+      this.maxRounds = 999;
+      this._usedQ = new Set();
+      this._slots = { p: {1:[],2:[],3:[]}, e: {1:[],2:[],3:[]} };
+      this._qSeq = {p:0,e:0};
+      this._qState = {p:null,e:null};
+      this._processedAns = {e:null};
+      this._timerP = null; this._timerE = null;
+      this._lastHostAction = 0;
 
       const self = this;
-      const fwd = ['start', 'question', 'timer', 'answered', 'attack', 'skill'];
-      fwd.forEach(function (name) {
-        self._offs.push(battle.on(name, function (d) { self.emit(name, d); }));
+      // Pre-generate three independent question lanes for each player.
+      [1,2,3].forEach(function(d){
+        self._slots.p[d].push(self._makeNetQuestion(d));
+        self._slots.e[d].push(self._makeNetQuestion(d));
       });
 
-      // siarkan soal
-      self._offs.push(battle.on('question', function (d) {
-        self.q = d.q;
-        self._answeredLocal = false; // reset giliran jawab host tiap ronde
-        const q = d.q;
-        self._write({ round: d.round, q: {
-          round: d.round, text: q.text, choices: q.choices,
-          topic: q.topic, difficulty: q.difficulty, limit: d.limit, answerIndex: q.answerIndex
-        }, ans: null, skillReq: false });
-      }));
-      // siarkan peristiwa sebagai frame
-      ['answered', 'attack', 'skill'].forEach(function (name) {
-        self._offs.push(battle.on(name, function (d) {
-          self._pendingEvts.push({ n: name, d: JSON.parse(JSON.stringify(d)) });
-          self._scheduleFlush();
-        }));
-      });
-      // akhir pertandingan
-      self._offs.push(battle.on('end', function (res) {
+      battle.on('end', function(res){
         self.finished = true;
-        self.emit('end', res); // teruskan ke UI/main (host juga butuh layar hasil)
+        self._clearNetTimers();
+        self.emit('end', res);
         self._flushNow();
         self._write({
-          status: 'done', winner: res.win ? 'host' : (res.draw ? null : 'guest'),
-          result: {
+          status:'done', winner: res.win ? 'host' : (res.draw ? null : 'guest'),
+          result:{
             hostRes: JSON.parse(JSON.stringify(res)),
             guestRes: JSON.parse(JSON.stringify(battle.resultFor('e', res.win ? 'p' : (res.draw ? null : 'e'), res.reason)))
           }
         });
-      }));
-
-      // terima: jawaban guest, permintaan skill, menyerah, detak
-      this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function (snap) {
-        if (!snap.exists()) return;
-        const d = snap.data();
-        self._watchStale('guestAlive', d);
-        if (d.surrender && !battle.finished) battle._finish('p', 'SURRENDER');
-        if (d.ans && d.ans.by === 'guest' && d.ans.round !== self._processedAnsRound) {
-          self._processedAnsRound = d.ans.round;
-          battle.netAnswer('e', d.ans.choice, d.ans.timeUsed);
-        }
-        if (d.skillReq && !self._skillHandled) {
-          self._skillHandled = true;
-          battle.useSkillSide('e', battle.e.hero.skill.id);
-          self._write({ skillReq: false });
-        }
-        if (d.skillReq === false) self._skillHandled = false;
       });
 
-      this._hb = setInterval(function () {
-        self._write({ hostAlive: Date.now() });
-      }, HB_MS);
+      this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function(snap){
+        if (!snap.exists() || self.finished) return;
+        const d=snap.data()||{};
+        self._watchStale('guestAlive', d);
+        if (d.surrender) { battle._finish('p','SURRENDER'); return; }
+
+        // Guest answers its own independent question (side e on host engine).
+        const ans=d.ansE;
+        if (ans && ans.by==='guest' && ans.qid && ans.qid!==self._processedAns.e) {
+          self._processedAns.e=ans.qid;
+          self._answerSide('e', Number(ans.choice), Number(ans.timeUsed), ans.qid);
+        }
+
+        // Guest selects difficulty for its NEXT question. Host consumes a preloaded question.
+        const req=d.questionReq;
+        if (req && req.by==='guest' && req.qid && req.qid!==self._lastGuestReq) {
+          self._lastGuestReq=req.qid;
+          const diff=U.clamp(Number(req.difficulty)||2,1,3);
+          self._issueQuestion('e', diff);
+          self._write({questionReq:null});
+        }
+
+        // Hero skill remains separate from question skill.
+        if (d.heroSkillReq && d.heroSkillReq.by==='guest' && d.heroSkillReq.id) {
+          if (d.heroSkillReq.qid !== self._lastHeroSkillReq) {
+            self._lastHeroSkillReq=d.heroSkillReq.qid;
+            battle.useSkillSide('e', d.heroSkillReq.id);
+            self._write({heroSkillReq:null});
+          }
+        }
+      }, function(e){ if(G.console) console.error('[ML PVP HOST LISTENER]', e && (e.code||e.message)||e); });
+
+      this._hb=setInterval(function(){ self._write({hostAlive:Date.now()}); },HB_MS);
     }
 
-    /* ---------- GUEST: cermin dari frame host ---------- */
+    _makeNetQuestion(diff){
+      const topic=U.pick(ML.QEngine.topics());
+      let q=null;
+      try{ q=ML.QEngine.make(topic,diff,this._usedQ); }catch(e){ q=null; }
+      if(!q){ try{ q=ML.QEngine.make('arit',diff,this._usedQ); }catch(e){} }
+      return q;
+    }
+    _questionPayload(q, side, seq){
+      return { qid:side+'-'+seq+'-'+Date.now(), round:seq, text:q.text, choices:q.choices,
+        topic:q.topic, difficulty:q.difficulty, limit:ML.Rules.timeForDiff(q.difficulty), answerIndex:q.answerIndex };
+    }
+    _issueQuestion(side,diff){
+      if(this.finished) return false;
+      const slot=this._slots[side][diff];
+      let q=slot && slot.shift();
+      if(!q) q=this._makeNetQuestion(diff);
+      if(!q) return false;
+      // Refill immediately so each button always has a fresh, different question ready.
+      this._slots[side][diff].push(this._makeNetQuestion(diff));
+      const seq=++this._qSeq[side];
+      const payload=this._questionPayload(q,side,seq);
+      this._qState[side]={payload:payload, q:q, answered:false, startedAt:Date.now()};
+      if(side==='p'){
+        this.p.answered=false;
+        this.q=q; this._answeredLocal=false; this._qRecvAt=Date.now(); this.qLimit=payload.limit;
+        this.emit('question',{q:q,round:seq,maxRounds:999,limit:payload.limit,pEnergy:this.p.energy,eEnergy:this.e.energy,parallel:true,side:'p',qid:payload.qid});
+        this._startLocalTimer('p',payload.limit);
+        this._write({qP:payload, ansE:null});
+      }else{
+        this.e.answered=false;
+        this._write({qE:payload});
+        this._startRemoteTimer('e', payload.limit);
+      }
+      return true;
+    }
+    _startLocalTimer(side,total){
+      const self=this;
+      if(this._timerP){clearInterval(this._timerP);this._timerP=null;}
+      if(side!=='p') return;
+      this._timerP=setInterval(function(){
+        if(self.finished||!self._qState.p||self._qState.p.answered){clearInterval(self._timerP);self._timerP=null;return;}
+        const left=Math.max(0,total-(Date.now()-self._qState.p.startedAt)/1000);
+        self.emit('timer',{left:left,total:total});
+        if(left<=0){clearInterval(self._timerP);self._timerP=null;self._answerSide('p',-1,total,self._qState.p.payload.qid);}
+      },100);
+    }
+    _startRemoteTimer(side,total){
+      const self=this;
+      if(this._timerE){clearTimeout(this._timerE);this._timerE=null;}
+      if(side!=='e') return;
+      const qid=this._qState.e && this._qState.e.payload.qid;
+      this._timerE=setTimeout(function(){
+        if(self.finished||!self._qState.e||self._qState.e.answered)return;
+        self._answerSide('e',-1,total,qid);
+      }, Math.max(100,total*1000+150));
+    }
+    _startGuestTimer(payload){
+      const self=this;
+      if(this._timerE){clearTimeout(this._timerE);clearInterval(this._timerE);this._timerE=null;}
+      const started=Date.now();
+      this._timerE=setInterval(function(){
+        const st=self._qState.e;if(!st||st.answered){clearInterval(self._timerE);self._timerE=null;return;}
+        const left=Math.max(0,payload.limit-(Date.now()-started)/1000);
+        if(left<=0){clearInterval(self._timerE);self._timerE=null;self._answerSide('e',-1,payload.limit,payload.qid);}
+      },100);
+    }
+    _clearNetTimers(){
+      if(this._timerP){clearInterval(this._timerP);this._timerP=null;}
+      if(this._timerE){clearTimeout(this._timerE);clearInterval(this._timerE);this._timerE=null;}
+    }
+    _answerSide(side,index,timeUsed,qid){
+      const st=this._qState[side]; if(this.finished||!st||st.answered||st.payload.qid!==qid) return false;
+      st.answered=true;
+      if(side==='p' && this._timerP){clearInterval(this._timerP);this._timerP=null;}
+      if(side==='e' && this._timerE){clearInterval(this._timerE);this._timerE=null;}
+      const b=this.battle;
+      b.q=st.q; b.qLimit=st.payload.limit; b.qStart=st.startedAt;
+      b.netAnswer(side,index,Math.max(0,Math.min(Number(timeUsed)||st.payload.limit,st.payload.limit)));
+      return true;
+    }
+
+    /* ---------- GUEST: soal independen milik guest, host tetap otoritatif ---------- */
     _initGuest() {
-      const cfg = this.cfgPvp;
-      const myHero = this._heroDef(cfg.myHeroId);
-      const oppHero = this._heroDef(cfg.opp.hero);
-      const myGear = cfg.myGear || {};
-      const oppGear = cfg.opp.gear || {};
-      const mk = function (hero, isPlayer, g) {
-        const hp = Math.round(hero.hp * (1 + (g.hpMul || 0)));
-        return {
-          hero: hero, isPlayer: isPlayer,
-          hp: hp, maxHp: hp, energy: ML.Rules.START_ENERGY, combo: 0,
-          shield: 0, empowered: null, comebackShield: false, answered: false,
-          gearCrit: g.critAdd || 0,
-          stats: { questions: 0, correct: 0, maxCombo: 0, perTopic: {} }
-        };
+      const cfg=this.cfgPvp, myHero=this._heroDef(cfg.myHeroId), oppHero=this._heroDef(cfg.opp.hero);
+      const mk=function(hero,isPlayer,g,level){
+        const hp=Math.round(hero.hp*(1+(g.hpMul||0)))+Math.max(0,(level-1)*(ML.Rules.LEVEL_HP_BONUS||0));
+        return {hero:hero,isPlayer:isPlayer,hp:hp,maxHp:hp,atk:Math.round(hero.atk*(1+(g.atkMul||0))),def:hero.def+(g.defAdd||0),
+          energy:ML.Rules.START_ENERGY,combo:0,shield:0,empowered:null,comebackShield:false,comebackUsed:false,gearCrit:g.critAdd||0,
+          answered:false,stats:{questions:0,correct:0,perfect:0,weak:0,wrong:0,maxCombo:0,hardCorrect:0,hardTotal:0,comeback:0,dmgDealt:0,dmgTaken:0,timeSum:0,perTopic:{}}};
       };
-      this.p = mk(myHero, true, myGear);   // aku
-      this.e = mk(oppHero, false, oppGear); // lawan (host)
-      this.cfg = { playerName: cfg.myName };
-      this.ai = { level: { bot: cfg.opp.name } };
-      this.q = null;
-      this.maxRounds = ML.Rules.MAX_ROUNDS;
-
-      const self = this;
-      this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function (snap) {
-        if (!snap.exists()) return;
-        const d = snap.data();
-        self._watchStale('hostAlive', d);
-
-        if (d.surrender && !self.finished) {
-          // host menyerah: hasil akan datang via result
+      this.p=mk(myHero,true,cfg.myGear||{},cfg.myLevel||1); // local guest
+      this.e=mk(oppHero,false,cfg.opp.gear||{},cfg.opp.level||1); // host
+      this.cfg={playerName:cfg.myName,oppName:cfg.opp.name,oppRating:cfg.opp.mr||1000};
+      this.ai={level:{bot:cfg.opp.name}};
+      this.q=null; this.maxRounds=999; this._lastQId=null; this._lastHostQId=null;
+      this._qState={p:null,e:null}; this._answeredLocal=false; this._qRecvAt=0; this._timerIv=null; this._usedLocal=new Set();
+      this._difficultyReqSent=false; this._lastFrameSeq=0;
+      const self=this;
+      this._unsubRoom=this.fb.fs.onSnapshot(this.roomRef,function(snap){
+        if(!snap.exists()||self.finished)return;
+        const d=snap.data()||{}; self._watchStale('hostAlive',d);
+        if(d.qP && d.qP.qid && d.qP.qid!==self._lastHostQId){
+          self._lastHostQId=d.qP.qid; self._applyOpponentQuestion(d.qP);
         }
-        if (d.q && d.q.round > self._lastQRound) {
-          self._lastQRound = d.q.round;
-          self.q = {
-            text: d.q.text, choices: d.q.choices, answerIndex: d.q.answerIndex,
-            topic: d.q.topic, difficulty: d.q.difficulty, explanation: '', answer: String(d.q.choices[d.q.answerIndex])
-          };
-          self._answeredLocal = false;
-          self._skillReqSent = false;
-          self._qRecvAt = Date.now();
-          if (self._timerIv) clearInterval(self._timerIv);
-          const total = d.q.limit || 10;
-          self._timerIv = setInterval(function () {
-            const left = Math.max(0, total - (Date.now() - self._qRecvAt) / 1000);
-            self.emit('timer', { left: left, total: total });
-            if (left <= 0 && self._timerIv) { clearInterval(self._timerIv); self._timerIv = null; }
-          }, 100);
-          self.emit('question', {
-            q: self.q, round: d.q.round, maxRounds: self.maxRounds, limit: total,
-            pEnergy: self.p.energy, eEnergy: self.e.energy
-          });
+        if(d.qE && d.qE.qid && d.qE.qid!==self._lastQId){
+          self._lastQId=d.qE.qid;
+          const q={text:d.qE.text,choices:d.qE.choices,answerIndex:d.qE.answerIndex,topic:d.qE.topic,difficulty:d.qE.difficulty,explanation:'',answer:String(d.qE.choices[d.qE.answerIndex])};
+          self.q=q; self._qState.p={payload:d.qE,q:q,answered:false,startedAt:Date.now()}; self._answeredLocal=false; self._qRecvAt=Date.now();
+          self.emit('question',{q:q,round:d.qE.round,maxRounds:999,limit:d.qE.limit||10,pEnergy:self.p.energy,eEnergy:self.e.energy,parallel:true,side:'p',qid:d.qE.qid});
+          self._startGuestTimer(d.qE);
         }
-
-        if (d.frame && d.frame.seq > self._lastSeq) {
-          self._lastSeq = d.frame.seq;
-          // perbarui cermin (frame host: p=host, e=guest)
-          self.e.hp = d.frame.hpP; self.e.energy = d.frame.enP; self.e.combo = d.frame.cbP; self.e.shield = d.frame.shP;
-          self.p.hp = d.frame.hpE; self.p.energy = d.frame.enE; self.p.combo = d.frame.cbE; self.p.shield = d.frame.shE;
-          self.p.empowered = d.frame.empE || null;
-          // putar ulang peristiwa dengan sisi DIBALIK (host->e, guest->p)
-          (d.frame.evts || []).forEach(function (ev) {
-            const dd = remapSides(ev.d);
-            if (ev.n === 'answered' && dd.side === 'p' && self._answeredLocal) return; // lokal sudah tampil
-            self.emit(ev.n, dd);
-          });
+        if(d.frame && d.frame.seq && d.frame.seq>self._lastFrameSeq){
+          self._lastFrameSeq=d.frame.seq;
+          self.e.hp=d.frame.hpP; self.e.energy=d.frame.enP; self.e.combo=d.frame.cbP; self.e.shield=d.frame.shP; self.e.empowered=d.frame.empP||null;
+          self.p.hp=d.frame.hpE; self.p.energy=d.frame.enE; self.p.combo=d.frame.cbE; self.p.shield=d.frame.shE; self.p.empowered=d.frame.empE||null;
+          (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,remapSides(ev.d)); });
         }
-
-        if (d.status === 'done' && d.result && !self.finished) {
-          self.finished = true;
-          if (self._timerIv) { clearInterval(self._timerIv); self._timerIv = null; }
-          const res = d.result.guestRes;
-          self.emit('end', Object.assign({}, res, { oppRating: (cfg.opp.mr || 1000) }));
-        } else if (d.status === 'aborted' && !self.finished) {
-          self.finished = true;
-          self.emit('aborted', {});
-        }
-      });
-
-      this._hb = setInterval(function () {
-        self._write({ guestAlive: Date.now() });
-      }, HB_MS);
+        if(d.status==='done'&&d.result&&!self.finished){
+          self.finished=true; if(self._timerIv){clearInterval(self._timerIv);self._timerIv=null;}
+          self.emit('end',Object.assign({},d.result.guestRes,{oppRating:cfg.opp.mr||1000}));
+        }else if(d.status==='aborted'&&!self.finished){self.finished=true;self.emit('aborted',{});}
+      },function(e){if(G.console)console.error('[ML PVP GUEST LISTENER]',e&& (e.code||e.message)||e);});
+      this._hb=setInterval(function(){self._write({guestAlive:Date.now()});},HB_MS);
+    }
+    _applyOpponentQuestion(payload){
+      // Opponent question is shown only through status; it never blocks the local question.
+      this._qState.e={payload:payload,answered:false,startedAt:Date.now()};
+      this.e.answered=false;
+    }
+    _startRemoteTimer(side,total){
+      const self=this;
+      if(this._timerE){clearTimeout(this._timerE);this._timerE=null;}
+      if(side!=='e') return;
+      const qid=this._qState.e && this._qState.e.payload.qid;
+      this._timerE=setTimeout(function(){
+        if(self.finished||!self._qState.e||self._qState.e.answered)return;
+        self._answerSide('e',-1,total,qid);
+      }, Math.max(100,total*1000+150));
+    }
+    _startGuestTimer(payload){
+      const self=this; if(this._timerIv){clearInterval(this._timerIv);this._timerIv=null;}
+      const started=Date.now(); this._qRecvAt=started;
+      this._timerIv=setInterval(function(){
+        if(self.finished||!self._qState.p||self._qState.p.answered){clearInterval(self._timerIv);self._timerIv=null;return;}
+        const left=Math.max(0,(payload.limit||10)-(Date.now()-started)/1000);
+        self.emit('timer',{left:left,total:payload.limit||10});
+        if(left<=0){clearInterval(self._timerIv);self._timerIv=null;self.playerAnswer(-1);}
+      },100);
     }
 
     /* ---------- WASIT: tonton ruangan (layar besar/turnamen) ---------- */
@@ -690,62 +756,61 @@
       });
     }
 
-    /* ---------- API seperti Battle (dipakai UI/main) ---------- */
-    start() {
-      this.emit('start', { p: this.p, e: this.e, cfg: this.cfg });
-      if (this.role === 'host') this.battle.start();
+    /* ---------- API seperti Battle (PvP bebas giliran) ---------- */
+    start(){
+      this.emit('start',{p:this.p,e:this.e,cfg:this.cfg});
+      if(this.role==='host'){
+        // Kedua pemain mendapat soal awal secara independen. Skill 1/2/3 sudah punya antrean soal masing-masing.
+        this._issueQuestion('p',2);
+        this._issueQuestion('e',2);
+      }
     }
-    playerAnswer(i) {
-      if (this.role === 'watch' || this.finished || this._answeredLocal || !this.q) return;
-      if (this.role === 'host') {
-        this._answeredLocal = true;
-        this.battle.playerAnswer(i);
+    playerAnswer(i){
+      if(this.role==='watch'||this.finished||this._answeredLocal||!this.q)return;
+      this._answeredLocal=true;
+      const st=this._qState.p;if(!st)return;
+      if(this.role==='host'){
+        this._answerSide('p',i,(Date.now()-st.startedAt)/1000,st.payload.qid);
         return;
       }
-      // guest: catat waktu lokal, kirim
-      this._answeredLocal = true;
-      const timeUsed = Math.max(0.1, (Date.now() - this._qRecvAt) / 1000);
-      const ok = i === this.q.answerIndex;
-      const grade = ML.Rules.gradeOf(timeUsed, ok, this.q.limit || 10);
-      // umpan balik lokal cepat utk sisi sendiri
-      this.emit('answered', {
-        side: 'p', correct: ok, grade: grade,
-        timeUsed: Math.round(timeUsed * 10) / 10,
-        answer: String(this.q.choices[this.q.answerIndex]), explanation: '',
-        combo: 0, energy: this.p.energy, source: 'NET',
-        hpP: this.p.hp, hpE: this.e.hp
-      });
-      if (this._timerIv) { clearInterval(this._timerIv); this._timerIv = null; }
-      this._write({ ans: { by: 'guest', round: this._lastQRound, choice: i, timeUsed: Math.round(timeUsed * 10) / 10 } });
+      const used=Math.max(0.1,Math.min((Date.now()-st.startedAt)/1000,st.payload.limit||10));
+      const ok=i===st.payload.answerIndex;
+      const grade=ML.Rules.gradeOf(used,ok,st.payload.limit||10);
+      st.answered=true;
+      if(this._timerIv){clearInterval(this._timerIv);this._timerIv=null;}
+      this.emit('answered',{side:'p',correct:ok,grade:grade,timeUsed:Math.round(used*10)/10,answer:String(st.q.choices[st.q.answerIndex]),explanation:'',combo:this.p.combo,energy:this.p.energy,source:'NET',hpP:this.p.hp,hpE:this.e.hp});
+      this._write({ansE:{by:'guest',qid:st.payload.qid,choice:i,timeUsed:Math.round(used*10)/10}});
     }
-    useSkill(id) {
-      if (this.role === 'watch' || this.finished) return false;
-      if (this.role === 'host') return this.battle.useSkill(id);
-      if (this._skillReqSent) return false;
-      this._skillReqSent = true;
-      this._write({ skillReq: true });
+    chooseDifficulty(diff){
+      if(this.role==='watch'||this.finished)return false;
+      const d=U.clamp(Math.round(diff)||2,1,3);
+      // Jangan membuat soal baru sebelum soal aktif selesai: ini mencegah pemain membatalkan soal berulang-ulang.
+      if(this.q && this._qState.p && !this._qState.p.answered)return false;
+      if(this.role==='host') return this._issueQuestion('p',d);
+      if(this._difficultyReqSent)return false;
+      this._difficultyReqSent=true;
+      const qid='req-'+getUid(this.fb)+'-'+Date.now();
+      this._write({questionReq:{by:'guest',difficulty:d,qid:qid}});
+      setTimeout(()=>{this._difficultyReqSent=false;},350);
+      this.emit('difficulty',{difficulty:d,next:true,parallel:true});
       return true;
     }
-    surrender() {
-      if (this.role === 'watch' || this.finished) return;
-      if (this.role === 'host') { this.battle.surrender(); }
-      else { this._write({ surrender: true }); setTimeout(() => this._abortLocal(), 4000); }
+    useSkill(id){
+      if(this.role==='watch'||this.finished)return false;
+      if(this.role==='host')return this.battle.useSkill(id);
+      const qid='skill-'+getUid(this.fb)+'-'+Date.now();
+      this._write({heroSkillReq:{by:'guest',id:id,qid:qid}}); return true;
     }
-    _abortLocal() {
-      if (this.finished) return;
-      this.finished = true;
-      this.emit('aborted', {});
+    surrender(){
+      if(this.role==='watch'||this.finished)return;
+      if(this.role==='host')this.battle.surrender();
+      else{this._write({surrender:true});setTimeout(()=>this._abortLocal(),4000);}
     }
-    destroy() {
-      this.finished = true;
-      this._offs.forEach(function (o) { try { o(); } catch (e) {} });
-      this._offs = [];
-      if (this._hb) { clearInterval(this._hb); this._hb = null; }
-      if (this._timerIv) { clearInterval(this._timerIv); this._timerIv = null; }
-      if (this._flushT) { clearTimeout(this._flushT); this._flushT = null; }
-      if (this._unsubRoom) { try { this._unsubRoom(); } catch (e) {} }
-      if (this.battle) this.battle.destroy();
-      this.kill();
+    _abortLocal(){if(this.finished)return;this.finished=true;this.emit('aborted',{});}
+    destroy(){
+      this.finished=true; this._offs.forEach(function(o){try{o();}catch(e){}}); this._offs=[];
+      if(this._hb){clearInterval(this._hb);this._hb=null;} if(this._timerIv){clearInterval(this._timerIv);this._timerIv=null;}
+      this._clearNetTimers&&this._clearNetTimers(); if(this._unsubRoom){try{this._unsubRoom();}catch(e){}} if(this.battle)this.battle.destroy(); this.kill();
     }
 
     /* ---------- util ---------- */
