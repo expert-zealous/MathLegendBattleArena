@@ -18,7 +18,7 @@
   const Backend = (ML.Backend = {
     mode: 'local',       // 'local' | 'firebase'
     online: false,
-    user: null,          // { uid }
+    user: null,          // { uid, linked, provider }
     _fb: null,           // { auth, db, fs }
     _saveTimer: null,
     _lastError: '',
@@ -40,8 +40,9 @@
         const cred = await authMod.signInAnonymously(auth);
         const db = fsMod.getFirestore(app);
 
-        this._fb = { auth: auth, db: db, fs: fsMod };
-        this.user = { uid: cred.user.uid };
+        this._fb = { auth: auth, db: db, fs: fsMod, authMod: authMod };
+        const u = auth.currentUser || cred.user;
+        this.user = { uid: u.uid, linked: !u.isAnonymous, provider: (u.providerData && u.providerData[0] && u.providerData[0].providerId) || (u.isAnonymous ? 'anonymous' : 'account') };
         this.mode = 'firebase';
         this.online = true;
       } catch (e) {
@@ -54,9 +55,54 @@
       return this;
     },
 
+
+    isLinked: function () { return !!(this.online && this.user && this.user.linked); },
+
+    /* Tautkan akun Google ke pemain saat ini. UID anonim dipertahankan,
+       sehingga progres lokal/cloud langsung menjadi milik akun permanen. */
+    linkGoogle: async function () {
+      if (!this.online || !this._fb || !this._fb.authMod) throw new Error('Firebase belum aktif');
+      const fb = this._fb, am = fb.authMod;
+      const provider = new am.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      let result;
+      try {
+        result = await am.linkWithPopup(fb.auth.currentUser, provider);
+      } catch (e) {
+        // Jika sudah pernah tertaut, login ulang memakai akun yang sama.
+        if (e && e.code === 'auth/credential-already-in-use') throw e;
+        throw e;
+      }
+      const u = result.user;
+      this.user = { uid: u.uid, linked: true, provider: 'google.com', email: u.email || '' };
+      return this.user;
+    },
+
+    /* Masuk kembali ke akun Google yang sudah pernah ditautkan.
+       Setelah berhasil, UID permanen akun dipakai untuk membaca players/{UID}. */
+    restoreGoogle: async function () {
+      if (!this.online || !this._fb || !this._fb.authMod) throw new Error('Firebase belum aktif');
+      const fb = this._fb, am = fb.authMod;
+      const provider = new am.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await am.signInWithPopup(fb.auth, provider);
+      const u = result.user;
+      this.user = { uid: u.uid, linked: true, provider: 'google.com', email: u.email || '' };
+      return this.user;
+    },
+
+    syncNow: async function (profile) {
+      if (!this.isLinked()) throw new Error('Akun belum ditautkan');
+      const fb = this._fb;
+      await fb.fs.setDoc(fb.fs.doc(fb.db, 'players', this.user.uid), {
+        data: JSON.stringify(profile), updatedAt: Date.now(), accountLinked: true, provider: this.user.provider || 'account'
+      }, { merge: true });
+      return true;
+    },
+
     /* ---------- cloud save (profil) ---------- */
     saveProfile: function (profile) {
-      if (!this.online || !this.user) return false;
+      if (!this.isLinked()) return false;
       const self = this;
       const fb = this._fb;
       try {
@@ -74,7 +120,7 @@
     },
 
     loadProfile: async function () {
-      if (!this.online || !this.user) return null;
+      if (!this.isLinked()) return null;
       try {
         const fb = this._fb;
         const snap = await fb.fs.getDoc(fb.fs.doc(fb.db, 'players', this.user.uid));

@@ -77,7 +77,11 @@
       this.save();
       return true;
     },
-    save: function () { ML.Storage.set('profile', this.data); },
+    save: function () {
+      ML.Storage.set('profile', this.data);
+      // Cloud hanya untuk akun yang sudah ditautkan; anonymous tetap lokal.
+      if (ML.Backend && ML.Backend.isLinked && ML.Backend.isLinked()) ML.Backend.saveProfile(this.data);
+    },
 
     today: function () {
       const d = new Date();

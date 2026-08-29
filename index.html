@@ -1238,6 +1238,7 @@ body {
       </div>
       <div class="panel res-stats" id="pf-stats"></div>
       <div class="panel res-box" id="pf-topics"></div>
+      <div class="panel pf-account" id="pf-account"></div>
       <div class="panel pf-settings">
         <button class="btn ghost wide" id="pf-sound" data-act="toggle-sound">🔊 EFEK SUARA: ON</button>
         <button class="btn ghost wide" id="pf-music" data-act="toggle-music">🎵 MUSIK: ON</button>
@@ -2982,7 +2983,11 @@ body {
       this.save();
       return true;
     },
-    save: function () { ML.Storage.set('profile', this.data); },
+    save: function () {
+      ML.Storage.set('profile', this.data);
+      // Cloud hanya untuk akun yang sudah ditautkan; anonymous tetap lokal.
+      if (ML.Backend && ML.Backend.isLinked && ML.Backend.isLinked()) ML.Backend.saveProfile(this.data);
+    },
 
     today: function () {
       const d = new Date();
@@ -3230,7 +3235,7 @@ window.ML_FIREBASE_CONFIG = {
   const Backend = (ML.Backend = {
     mode: 'local',       // 'local' | 'firebase'
     online: false,
-    user: null,          // { uid }
+    user: null,          // { uid, linked, provider }
     _fb: null,           // { auth, db, fs }
     _saveTimer: null,
     _lastError: '',
@@ -3252,8 +3257,9 @@ window.ML_FIREBASE_CONFIG = {
         const cred = await authMod.signInAnonymously(auth);
         const db = fsMod.getFirestore(app);
 
-        this._fb = { auth: auth, db: db, fs: fsMod };
-        this.user = { uid: cred.user.uid };
+        this._fb = { auth: auth, db: db, fs: fsMod, authMod: authMod };
+        const u = auth.currentUser || cred.user;
+        this.user = { uid: u.uid, linked: !u.isAnonymous, provider: (u.providerData && u.providerData[0] && u.providerData[0].providerId) || (u.isAnonymous ? 'anonymous' : 'account') };
         this.mode = 'firebase';
         this.online = true;
       } catch (e) {
@@ -3266,9 +3272,54 @@ window.ML_FIREBASE_CONFIG = {
       return this;
     },
 
+
+    isLinked: function () { return !!(this.online && this.user && this.user.linked); },
+
+    /* Tautkan akun Google ke pemain saat ini. UID anonim dipertahankan,
+       sehingga progres lokal/cloud langsung menjadi milik akun permanen. */
+    linkGoogle: async function () {
+      if (!this.online || !this._fb || !this._fb.authMod) throw new Error('Firebase belum aktif');
+      const fb = this._fb, am = fb.authMod;
+      const provider = new am.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      let result;
+      try {
+        result = await am.linkWithPopup(fb.auth.currentUser, provider);
+      } catch (e) {
+        // Jika sudah pernah tertaut, login ulang memakai akun yang sama.
+        if (e && e.code === 'auth/credential-already-in-use') throw e;
+        throw e;
+      }
+      const u = result.user;
+      this.user = { uid: u.uid, linked: true, provider: 'google.com', email: u.email || '' };
+      return this.user;
+    },
+
+    /* Masuk kembali ke akun Google yang sudah pernah ditautkan.
+       Setelah berhasil, UID permanen akun dipakai untuk membaca players/{UID}. */
+    restoreGoogle: async function () {
+      if (!this.online || !this._fb || !this._fb.authMod) throw new Error('Firebase belum aktif');
+      const fb = this._fb, am = fb.authMod;
+      const provider = new am.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await am.signInWithPopup(fb.auth, provider);
+      const u = result.user;
+      this.user = { uid: u.uid, linked: true, provider: 'google.com', email: u.email || '' };
+      return this.user;
+    },
+
+    syncNow: async function (profile) {
+      if (!this.isLinked()) throw new Error('Akun belum ditautkan');
+      const fb = this._fb;
+      await fb.fs.setDoc(fb.fs.doc(fb.db, 'players', this.user.uid), {
+        data: JSON.stringify(profile), updatedAt: Date.now(), accountLinked: true, provider: this.user.provider || 'account'
+      }, { merge: true });
+      return true;
+    },
+
     /* ---------- cloud save (profil) ---------- */
     saveProfile: function (profile) {
-      if (!this.online || !this.user) return false;
+      if (!this.isLinked()) return false;
       const self = this;
       const fb = this._fb;
       try {
@@ -3286,7 +3337,7 @@ window.ML_FIREBASE_CONFIG = {
     },
 
     loadProfile: async function () {
-      if (!this.online || !this.user) return null;
+      if (!this.isLinked()) return null;
       try {
         const fb = this._fb;
         const snap = await fb.fs.getDoc(fb.fs.doc(fb.db, 'players', this.user.uid));
@@ -4669,6 +4720,15 @@ window.ML_FIREBASE_CONFIG = {
 
       el('pf-topics').innerHTML = '<h3>📈 PENGUASAAN MATERI</h3>' + this.topicBars(pf.perTopic, true);
 
+      const B = ML.Backend;
+      const linked = !!(B && B.isLinked && B.isLinked());
+      const acct = el('pf-account');
+      if (acct) {
+        acct.innerHTML = linked
+          ? '<div class="account-state ok">☁️ <b>AKUN DITAUTKAN</b><br><small>Progres tersimpan ke Cloud dan dapat dipulihkan di perangkat lain.</small></div><button class="btn primary wide" data-act="sync-cloud">☁️ SINKRONKAN SEKARANG</button>'
+          : '<div class="account-state warn">🔒 <b>PROGRES BELUM DIAMANKAN</b><br><small>Tautkan akun untuk menyimpan Level, Hero, atribut, Coin, Diamond, EXP, dan Rank.</small></div><button class="btn online wide" data-act="link-google">🔗 TAUTKAN AKUN & SIMPAN PROGRES</button><button class="btn primary wide" data-act="restore-google">☁️ MASUK & PULIHKAN PROGRES</button>';
+      }
+
       el('pf-sound').innerHTML = AU.enabled ? '🔊 EFEK SUARA: ON' : '🔇 EFEK SUARA: OFF';
       const det = AU.filesDetected ? AU.filesDetected() : { ok: 0, total: 0 };
       el('pf-music').innerHTML = (AU.musicEnabled ? '🎵 MUSIK: ON' : '🎵 MUSIK: OFF') +
@@ -5491,6 +5551,54 @@ window.ML_FIREBASE_CONFIG = {
         });
         break;
 
+      case 'link-google':
+        (async function () {
+          const B = ML.Backend;
+          if (!B || !B.online) { UI.toast('⚠️ Firebase belum aktif. Hubungkan konfigurasi Firebase terlebih dahulu.', false); return; }
+          try {
+            UI.toast('🔐 Membuka Google…');
+            await B.linkGoogle();
+            await B.syncNow(P.data);
+            UI.renderProfile();
+            UI.toast('🎉 Akun berhasil ditautkan! Progres Anda sudah diamankan.', true);
+          } catch (e) {
+            const msg = (e && (e.message || e.code)) || 'Gagal menautkan akun';
+            UI.toast('⚠️ ' + msg, false);
+          }
+        })();
+        break;
+
+      case 'restore-google':
+        (async function () {
+          const B = ML.Backend;
+          if (!B || !B.online) { UI.toast('⚠️ Firebase belum aktif.', false); return; }
+          try {
+            UI.toast('🔐 Pilih akun Google untuk memulihkan progres…');
+            await B.restoreGoogle();
+            const remote = await B.loadProfile();
+            if (!remote) {
+              UI.renderProfile();
+              UI.toast('ℹ️ Tidak ditemukan progres cloud pada akun ini.', false);
+              return;
+            }
+            P.loadFrom(remote);
+            P.save();
+            UI.renderProfile();
+            UI.renderHome();
+            UI.toast('☁️ Progres berhasil dipulihkan!', true);
+          } catch (e) {
+            UI.toast('⚠️ Pemulihan gagal: ' + ((e && (e.message || e.code)) || 'coba lagi'), false);
+          }
+        })();
+        break;
+
+      case 'sync-cloud':
+        (async function () {
+          try { await ML.Backend.syncNow(P.data); UI.toast('☁️ Progres berhasil disinkronkan', true); UI.renderProfile(); }
+          catch (e) { UI.toast('⚠️ Sinkronisasi gagal: ' + ((e && e.message) || 'coba lagi'), false); }
+        })();
+        break;
+
       case 'toggle-music':
         AU.musicEnabled = !AU.musicEnabled;
         P.data.settings.music = AU.musicEnabled;
@@ -5636,7 +5744,7 @@ window.ML_FIREBASE_CONFIG = {
     // Cloud save: ambil profil cloud bila lebih maju dari lokal.
     if (ML.Backend && ML.Backend.init) {
       ML.Backend.init().then(function () {
-        if (!ML.Backend.online) return;
+        if (!ML.Backend.online || !(ML.Backend.isLinked && ML.Backend.isLinked())) return;
         return ML.Backend.loadProfile().then(function (remote) {
           const adopted = remote ? P.loadFrom(remote) : false;
           if (UI.current === 'home') UI.renderHome();

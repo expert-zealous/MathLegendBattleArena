@@ -441,6 +441,15 @@
 
       el('pf-topics').innerHTML = '<h3>📈 PENGUASAAN MATERI</h3>' + this.topicBars(pf.perTopic, true);
 
+      const B = ML.Backend;
+      const linked = !!(B && B.isLinked && B.isLinked());
+      const acct = el('pf-account');
+      if (acct) {
+        acct.innerHTML = linked
+          ? '<div class="account-state ok">☁️ <b>AKUN DITAUTKAN</b><br><small>Progres tersimpan ke Cloud dan dapat dipulihkan di perangkat lain.</small></div><button class="btn primary wide" data-act="sync-cloud">☁️ SINKRONKAN SEKARANG</button>'
+          : '<div class="account-state warn">🔒 <b>PROGRES BELUM DIAMANKAN</b><br><small>Tautkan akun untuk menyimpan Level, Hero, atribut, Coin, Diamond, EXP, dan Rank.</small></div><button class="btn online wide" data-act="link-google">🔗 TAUTKAN AKUN & SIMPAN PROGRES</button><button class="btn primary wide" data-act="restore-google">☁️ MASUK & PULIHKAN PROGRES</button>';
+      }
+
       el('pf-sound').innerHTML = AU.enabled ? '🔊 EFEK SUARA: ON' : '🔇 EFEK SUARA: OFF';
       const det = AU.filesDetected ? AU.filesDetected() : { ok: 0, total: 0 };
       el('pf-music').innerHTML = (AU.musicEnabled ? '🎵 MUSIK: ON' : '🎵 MUSIK: OFF') +

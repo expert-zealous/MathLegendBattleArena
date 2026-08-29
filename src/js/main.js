@@ -323,6 +323,54 @@
         });
         break;
 
+      case 'link-google':
+        (async function () {
+          const B = ML.Backend;
+          if (!B || !B.online) { UI.toast('⚠️ Firebase belum aktif. Hubungkan konfigurasi Firebase terlebih dahulu.', false); return; }
+          try {
+            UI.toast('🔐 Membuka Google…');
+            await B.linkGoogle();
+            await B.syncNow(P.data);
+            UI.renderProfile();
+            UI.toast('🎉 Akun berhasil ditautkan! Progres Anda sudah diamankan.', true);
+          } catch (e) {
+            const msg = (e && (e.message || e.code)) || 'Gagal menautkan akun';
+            UI.toast('⚠️ ' + msg, false);
+          }
+        })();
+        break;
+
+      case 'restore-google':
+        (async function () {
+          const B = ML.Backend;
+          if (!B || !B.online) { UI.toast('⚠️ Firebase belum aktif.', false); return; }
+          try {
+            UI.toast('🔐 Pilih akun Google untuk memulihkan progres…');
+            await B.restoreGoogle();
+            const remote = await B.loadProfile();
+            if (!remote) {
+              UI.renderProfile();
+              UI.toast('ℹ️ Tidak ditemukan progres cloud pada akun ini.', false);
+              return;
+            }
+            P.loadFrom(remote);
+            P.save();
+            UI.renderProfile();
+            UI.renderHome();
+            UI.toast('☁️ Progres berhasil dipulihkan!', true);
+          } catch (e) {
+            UI.toast('⚠️ Pemulihan gagal: ' + ((e && (e.message || e.code)) || 'coba lagi'), false);
+          }
+        })();
+        break;
+
+      case 'sync-cloud':
+        (async function () {
+          try { await ML.Backend.syncNow(P.data); UI.toast('☁️ Progres berhasil disinkronkan', true); UI.renderProfile(); }
+          catch (e) { UI.toast('⚠️ Sinkronisasi gagal: ' + ((e && e.message) || 'coba lagi'), false); }
+        })();
+        break;
+
       case 'toggle-music':
         AU.musicEnabled = !AU.musicEnabled;
         P.data.settings.music = AU.musicEnabled;
@@ -468,7 +516,7 @@
     // Cloud save: ambil profil cloud bila lebih maju dari lokal.
     if (ML.Backend && ML.Backend.init) {
       ML.Backend.init().then(function () {
-        if (!ML.Backend.online) return;
+        if (!ML.Backend.online || !(ML.Backend.isLinked && ML.Backend.isLinked())) return;
         return ML.Backend.loadProfile().then(function (remote) {
           const adopted = remote ? P.loadFrom(remote) : false;
           if (UI.current === 'home') UI.renderHome();
