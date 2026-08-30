@@ -9511,5 +9511,351 @@ body {
   }
 })();
 </script>
+<style id="ml-ui-stage2">
+/* ============================================================
+   UI TAHAP 2 — BATTLE MOBILE POLISH
+   Hanya #screen-battle. Aman dicabut.
+   ============================================================ */
+
+#screen-battle {
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 18%, rgba(99,102,241,.16), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(15,23,42,.10), transparent 60%),
+    linear-gradient(180deg, #eef2ff 0%, #f5f3ff 45%, #fff7ed 100%);
+}
+
+#screen-battle .battle {
+  gap: 7px;
+}
+
+/* ——— HUD atas ——— */
+#screen-battle .b-top {
+  background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
+  border: 1px solid rgba(255,255,255,.85);
+  border-radius: 18px;
+  padding: 8px 8px 8px 44px;
+  box-shadow: 0 6px 18px rgba(99,102,241,.10);
+}
+
+#screen-battle .f-ava {
+  width: 48px; height: 48px;
+  border-width: 3px;
+  box-shadow: 0 4px 10px rgba(15,23,42,.12);
+}
+
+#screen-battle .fighter.foe .f-ava {
+  border-color: #fda4af;
+}
+
+#screen-battle .f-name {
+  font-size: 13px;
+  letter-spacing: .4px;
+}
+
+#screen-battle .hpbar {
+  height: 18px;
+  border-width: 2px;
+  background: linear-gradient(180deg, #cbd5e1, #e2e8f0);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,.16);
+}
+
+#screen-battle .hpfill.p {
+  background: linear-gradient(90deg, #38bdf8, #2563eb, #1d4ed8);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+
+#screen-battle .hpfill.e {
+  background: linear-gradient(90deg, #fb7185, #e11d48, #be123c);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+}
+
+#screen-battle .hptext {
+  font-size: 11px;
+  letter-spacing: .3px;
+}
+
+#screen-battle .pip {
+  width: 9px; height: 13px;
+  border-radius: 3px;
+}
+
+#screen-battle .pip.on {
+  box-shadow: 0 0 6px rgba(245,158,11,.55);
+}
+
+#screen-battle .vs-box {
+  min-width: 58px;
+}
+
+#screen-battle .vs {
+  font-size: 18px;
+  letter-spacing: 2px;
+  filter: drop-shadow(0 2px 4px rgba(239,68,68,.25));
+}
+
+#screen-battle .round {
+  font-size: 11px;
+  font-weight: 900;
+  color: #64748b;
+}
+
+#screen-battle .btn-quit {
+  width: 40px; height: 40px;
+  border-radius: 13px;
+  background: rgba(255,255,255,.95);
+  border: 1px solid rgba(226,232,240,.9);
+}
+
+#screen-battle .live-badge {
+  font-size: 10px;
+  padding: 5px 12px;
+  box-shadow: 0 4px 12px rgba(220,38,38,.35);
+}
+
+/* ——— Arena / stage ——— */
+#screen-battle .arena {
+  min-height: 108px;
+  max-height: 176px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,.95);
+  background:
+    radial-gradient(60% 80% at 20% 80%, rgba(37,99,235,.16), transparent 70%),
+    radial-gradient(60% 80% at 80% 80%, rgba(225,29,72,.14), transparent 70%),
+    radial-gradient(50% 40% at 50% 100%, rgba(251,191,36,.18), transparent 70%),
+    linear-gradient(180deg, #ffffff, #eef2ff 70%, #e0e7ff);
+  box-shadow:
+    0 8px 22px rgba(99,102,241,.14),
+    inset 0 -18px 28px rgba(15,23,42,.06);
+  overflow: hidden;
+}
+
+#screen-battle .arena::after {
+  content: '';
+  position: absolute;
+  left: 12%; right: 12%;
+  bottom: 10px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(15,23,42,.16), transparent 70%);
+  pointer-events: none;
+}
+
+#screen-battle .hero-fig {
+  width: clamp(72px, 22vw, 108px);
+  z-index: 2;
+}
+
+#screen-battle .hero-fig .hero-img {
+  filter: drop-shadow(0 8px 12px rgba(15,23,42,.18));
+}
+
+#screen-battle .dmg {
+  font-size: 28px;
+  text-shadow: 0 2px 0 #fff, 0 6px 12px rgba(0,0,0,.22);
+}
+
+#screen-battle .dmg.crit {
+  font-size: 36px;
+}
+
+/* ——— Skill bar ——— */
+#screen-battle .skillbar {
+  gap: 8px;
+  padding: 2px 2px 0;
+}
+
+#screen-battle .diff-skill {
+  border-radius: 13px;
+  padding: 8px 8px;
+  min-width: 72px;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15,23,42,.05);
+}
+
+#screen-battle .diff-skill b {
+  font-size: 10px;
+  letter-spacing: .4px;
+}
+
+#screen-battle .diff-skill span {
+  font-size: 9px;
+  color: #64748b;
+}
+
+#screen-battle .diff-skill.selected {
+  border-color: #6366f1;
+  background: linear-gradient(180deg, #eef2ff, #e0e7ff);
+  box-shadow: 0 0 0 2px rgba(99,102,241,.12), 0 4px 12px rgba(99,102,241,.16);
+}
+
+#screen-battle .diff-skill.easy.selected {
+  border-color: #10b981;
+  background: linear-gradient(180deg, #ecfdf5, #d1fae5);
+  box-shadow: 0 0 0 2px rgba(16,185,129,.12);
+}
+
+#screen-battle .diff-skill.hard.selected {
+  border-color: #ef4444;
+  background: linear-gradient(180deg, #fef2f2, #fee2e2);
+  box-shadow: 0 0 0 2px rgba(239,68,68,.12);
+}
+
+#screen-battle .skill-btn {
+  border-radius: 14px;
+  padding: 11px 14px;
+  font-size: 13px;
+  box-shadow: 0 5px 14px rgba(16,185,129,.32);
+}
+
+#screen-battle .skill-btn.armed {
+  box-shadow: 0 0 0 2px rgba(245,158,11,.25), 0 6px 16px rgba(234,88,12,.35);
+}
+
+#screen-battle .skill-hint {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* ——— Panel soal = command panel ——— */
+#screen-battle .qpanel {
+  border-radius: 20px;
+  padding: 10px 12px 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,252,.94));
+  border: 1px solid rgba(255,255,255,.95);
+  box-shadow:
+    0 10px 24px rgba(15,23,42,.08),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+#screen-battle .q-topic {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 2px 8px rgba(79,70,229,.28);
+}
+
+#screen-battle .q-diff {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+#screen-battle .q-timer {
+  height: 12px;
+  background: #e2e8f0;
+}
+
+#screen-battle .q-timerbar {
+  background: linear-gradient(90deg, #34d399, #10b981);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+
+#screen-battle .q-timerbar.warn {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+#screen-battle .q-timerbar.danger {
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+
+#screen-battle .q-time {
+  font-size: 16px;
+  min-width: 28px;
+}
+
+#screen-battle .q-text {
+  font-size: clamp(22px, 6.2vw, 34px);
+  padding: 10px 2px 8px;
+  color: #0f172a;
+  text-shadow: 0 1px 0 rgba(255,255,255,.8);
+}
+
+#screen-battle .answers {
+  gap: 8px;
+}
+
+#screen-battle .ans {
+  min-height: 56px;
+  border-radius: 16px;
+  border: 2.5px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  box-shadow: 0 3px 10px rgba(15,23,42,.05);
+  font-size: clamp(16px, 4.4vw, 21px);
+}
+
+#screen-battle .ans b {
+  width: 32px; height: 32px;
+  border-radius: 11px;
+  box-shadow: 0 2px 6px rgba(79,70,229,.25);
+}
+
+#screen-battle .ans:active {
+  transform: scale(.98);
+  border-color: #a5b4fc;
+}
+
+#screen-battle .ans.correct {
+  border-color: #10b981;
+  background: linear-gradient(180deg, #ecfdf5, #d1fae5);
+  box-shadow: 0 0 0 2px rgba(16,185,129,.12);
+}
+
+#screen-battle .ans.wrong {
+  border-color: #ef4444;
+  background: linear-gradient(180deg, #fef2f2, #fee2e2);
+}
+
+#screen-battle .q-feedback {
+  min-height: 22px;
+  font-size: 13px;
+}
+
+/* HP tinggi: arena lebih besar, jawaban tetap di zona jempol */
+@media (orientation: portrait) and (min-height: 740px) {
+  #screen-battle .arena {
+    min-height: 140px;
+    max-height: 210px;
+  }
+  #screen-battle .hero-fig {
+    width: clamp(86px, 24vw, 124px);
+  }
+  #screen-battle .q-text {
+    font-size: clamp(26px, 6.8vw, 38px);
+    padding: 14px 4px 12px;
+  }
+  #screen-battle .ans { min-height: 60px; }
+}
+
+@media (orientation: portrait) and (min-height: 820px) {
+  #screen-battle .arena {
+    min-height: 160px;
+    max-height: 240px;
+  }
+}
+
+/* Jangan rusak landscape wasit — biarkan CSS lama yang merapatkan */
+@media (orientation: landscape) and (max-height: 560px) {
+  #screen-battle .b-top {
+    padding: 4px 6px 4px 44px;
+    border-radius: 14px;
+  }
+  #screen-battle .arena {
+    min-height: 62px;
+    max-height: 96px;
+  }
+}
+</style>
+
+<script>
+(function () {
+  'use strict';
+  function boot() {
+    if (!window.ML || !ML.UI) return setTimeout(boot, 50);
+    if (ML._uiStage2) return;
+    ML._uiStage2 = true;
+    console.log('[ML] UI Tahap 2 Battle polish aktif');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
 </body>
 </html>
