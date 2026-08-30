@@ -3805,8 +3805,16 @@ window.ML_FIREBASE_CONFIG = {
         if(done||!snap.exists())return;
         const d=snap.data()||{};
         if(d.playerA&&d.playerB){
+          // V24.1: sebelumnya Wasit langsung membuka battle TANPA mengubah
+          // status room menjadi playing. Akibatnya Player A/B tetap berada
+          // pada modal "menunggu lawan". Ubah status terlebih dahulu, baru
+          // semua client menerima sinyal mulai yang sama.
           done=true; if(unsub)unsub(); onState&&onState('starting');
-          onReady&&onReady({role:'referee',roomId:c,players:{a:d.playerA,b:d.playerB},opp:d.playerB});
+          fs.updateDoc(ref,_clean({status:'playing',startedAt:Date.now(),updatedAt:Date.now()}))
+            .then(function(){
+              onReady&&onReady({role:'referee',roomId:c,players:{a:d.playerA,b:d.playerB},opp:d.playerB});
+            })
+            .catch(function(e){onFail&&onFail(String(e&&(e.code||e.message)||e));});
         }
       },function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
     }).catch(function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
