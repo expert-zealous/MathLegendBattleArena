@@ -591,7 +591,7 @@
         self.emit('end', res);
         self._flushNow();
         self._write({
-          status:'done', winner: res.win ? 'host' : (res.draw ? null : 'guest'),
+          status:'done', winner: res.win ? (self.role==='referee'?'playerA':'host') : (res.draw ? null : (self.role==='referee'?'playerB':'guest')),
           result:{
             hostRes: JSON.parse(JSON.stringify(res)),
             guestRes: JSON.parse(JSON.stringify(battle.resultFor('e', res.win ? 'p' : (res.draw ? null : 'e'), res.reason)))
@@ -687,11 +687,13 @@
       if(side==='p'){
         this.p.answered=false;
         this.q=q; this._answeredLocal=false; this.qLimit=payload.limit;
-        // Mirror question into real Battle because Host UI V23 attaches there.
         if(this.battle){ this.battle.q=q; this.battle.qLimit=payload.limit; }
-        this.emit('question',{q:q,round:seq,maxRounds:999,limit:payload.limit,pEnergy:this.p.energy,eEnergy:this.e.energy,parallel:true,side:'p',qid:payload.qid});
-        this._startLocalTimer('p',payload.limit);
-        this._write({qP:payload, ansE:null});
+        // Wasit hanya mengelola state, bukan menjawab soal Player A.
+        if(this.role!=='referee'){
+          this.emit('question',{q:q,round:seq,maxRounds:999,limit:payload.limit,pEnergy:this.p.energy,eEnergy:this.e.energy,parallel:true,side:'p',qid:payload.qid});
+          this._startLocalTimer('p',payload.limit);
+        }
+        this._write({qP:payload, ansP:null});
       }else{
         this.e.answered=false;
         this._write({qE:payload});
@@ -821,7 +823,7 @@
       this._unsubRoom=this.fb.fs.onSnapshot(this.roomRef,function(snap){
         if(!snap.exists()||self.finished)return;
         const d=snap.data()||{}; self._watchStale('hostAlive',d);
-        if(d.qP && d.qP.qid && d.qP.qid!==self._lastHostQId){
+        if(self.role!=='playerA' && d.qP && d.qP.qid && d.qP.qid!==self._lastHostQId){
           self._lastHostQId=d.qP.qid; self._applyOpponentQuestion(d.qP);
         }
         const myQ = self.role==='playerA' ? d.qP : d.qE;
@@ -846,7 +848,8 @@
         }
         if(d.status==='done'&&d.result&&!self.finished){
           self.finished=true; if(self._timerIv){clearInterval(self._timerIv);self._timerIv=null;}
-          self.emit('end',Object.assign({},d.result.guestRes,{oppRating:cfg.opp.mr||1000}));
+          const myResult = self.role==='playerA' ? d.result.hostRes : d.result.guestRes;
+          self.emit('end',Object.assign({},myResult,{oppRating:cfg.opp.mr||1000}));
         }else if(d.status==='aborted'&&!self.finished){self.finished=true;self.emit('aborted',{});}
       },function(e){if(G.console)console.error('[ML PVP GUEST LISTENER]',e&& (e.code||e.message)||e);});
       this._hb=setInterval(function(){self._write({guestAlive:Date.now()});},HB_MS);
@@ -954,8 +957,8 @@
     /* ---------- API seperti Battle (PvP bebas giliran) ---------- */
     start(){
       this.emit('start',{p:this.p,e:this.e,cfg:this.cfg});
-      if(this.role==='host'){
-        // Kedua pemain mendapat soal awal secara independen. Skill 1/2/3 sudah punya antrean soal masing-masing.
+      if(this.role==='host' || this.role==='referee'){
+        // Wasit adalah engine otoritatif: buat dua soal awal SEKALIGUS.
         this._issueQuestion('p',2);
         this._issueQuestion('e',2);
       }

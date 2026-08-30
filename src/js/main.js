@@ -66,7 +66,18 @@
     App.battle = net;
 
     UI.attachBattle(net);
-    net.on('end', function (res) { onEngineEnd(net, res, null); });
+    net.on('end', function (res) {
+      // Wasit bukan pemain: jangan tampilkan Victory/Defeat milik Player A.
+      if(info.role==='referee'){
+        AU.musicStop();
+        setTimeout(function(){
+          UI.toast('🏁 Pertandingan selesai — Wasit menampilkan hasil pertandingan');
+          UI.show('home');
+        },1100);
+      }else{
+        onEngineEnd(net, res, null);
+      }
+    });
     net.on('aborted', function () {
       UI.detachBattle();
       net.destroy();
