@@ -3517,18 +3517,57 @@ window.ML_FIREBASE_CONFIG = {
     },
 
     /* ---------- leaderboard online ---------- */
-    submitScore: async function (entry) { // { name, hero, mr, level, school? }
-      if (!this.online || !this.user) return false;
-      try {
-        const fb = this._fb;
-        await fb.fs.setDoc(
-          fb.fs.doc(fb.db, 'leaderboard', this.user.uid),
-          Object.assign({ updatedAt: Date.now() }, entry),
-          { merge: true }
-        );
-        return true;
-      } catch (e) { this._lastError = (e && e.message) || ''; return false; }
-    },
+     submitScore: async function (entry) { // { name, hero, mr, level, school? }
+ if (!this.online || !this.user) return false;
+ try {
+ const fb = this._fb;
+ const payload = Object.assign({ updatedAt: Date.now() }, entry);
+ // Simpan versi lowercase agar query sekolah tidak salah cocok karena huruf.
+ payload.schoolKey = String(entry.school || '').trim().toLowerCase();
+ await fb.fs.setDoc(
+ fb.fs.doc(fb.db, 'leaderboard', this.user.uid),
+ payload,
+ { merge: true }
+ );
+ return true;
+ } catch (e) { this._lastError = (e && e.message) || ''; return false; }
+ },
+
+     /* ---------- Ambil daftar sekolah yang sama ---------- */
+ schoolScores: async function (schoolName, limit) {
+ if (!this.online) return null;
+ if (!schoolName) return [];
+ try {
+ const fb = this._fb;
+ // Firestore case-sensitive, jadi kita simpan versi lowercase juga.
+ const key = String(schoolName).trim().toLowerCase();
+ const q = fb.fs.query(
+ fb.fs.collection(fb.db, 'leaderboard'),
+ fb.fs.where('schoolKey', '==', key),
+ fb.fs.orderBy('mr', 'desc'),
+ fb.fs.limit(limit || 10)
+ );
+ const snap = await fb.fs.getDocs(q);
+ const out = [];
+ snap.forEach(function (d) {
+ const v = d.data();
+ if (v && typeof v.mr === 'number') {
+ out.push({
+ name: String(v.name || 'TANPA NAMA').slice(0, 12),
+ hero: v.hero || 'raka',
+ mr: Math.max(0, Math.min(9999, Math.round(v.mr))),
+ level: v.level || 1,
+ school: v.school || '',
+ me: d.id === Backend.user.uid
+ });
+ }
+ });
+ return out;
+ } catch (e) {
+ this._lastError = (e && e.message) || '';
+ return null;
+ }
+ },
 
     topScores: async function (limit) {
       if (!this.online) return null;
@@ -5074,11 +5113,9 @@ window.ML_FIREBASE_CONFIG = {
  ML.Backend.topScores(10).then(function (list) {
  if (!list || self.current !== 'leaderboard' || self.boardTab !== tab) return;
  if (tab === 'friends') return; // tab teman: menyusul di tahap berikutnya
-  if (tab === 'school') {
- // Filter pemain yang sekolahnya sama.
- const mySchool = (P.data.school || '').trim().toLowerCase();
+   if (tab === 'school') {
+ const mySchool = (P.data.school || '').trim();
  if (!mySchool) {
- // Pemain belum mengisi sekolah: tampilkan pesan ajakan.
  document.getElementById('board-list').innerHTML =
  '<div class="panel" style="text-align:center;padding:20px;color:#64748b">' +
  ' <b>Isi nama sekolahmu dulu</b><br>' +
@@ -5086,14 +5123,31 @@ window.ML_FIREBASE_CONFIG = {
  '</div>';
  return;
  }
- let schoolRows = list.filter(function (r) {
- return (r.school || '').trim().toLowerCase() === mySchool;
- });
- if (!schoolRows.some(function (r) { return r.me; })) {
- schoolRows = schoolRows.concat(ML.Leaderboard.meEntry());
+ // Query khusus: langsung ambil pemain sesekolah, bukan menyaring dari Top 10 global.
+ if (ML.Backend.schoolScores) {
+ ML.Backend.schoolScores(mySchool, 10).then(function (schoolList) {
+ if (!schoolList || self.current !== 'leaderboard' || self.boardTab !== tab) return;
+ if (!schoolList.some(function (r) { return r.me; })) {
+ schoolList = schoolList.concat(ML.Leaderboard.meEntry());
  }
- schoolRows.sort(function (a, b) { return b.mr - a.mr; });
- self._boardRows(schoolRows.slice(0, 10), true);
+ schoolList.sort(function (a, b) { return b.mr - a.mr; });
+ if (schoolList.length === 0) {
+ document.getElementById('board-list').innerHTML =
+ '<div class="panel" style="text-align:center;padding:20px;color:#64748b">' +
+ ' <b>Belum ada pemain lain</b><br>' +
+ '<small>Ajak teman sekolahmu bermain dan isi nama sekolah yang sama</small>' +
+ '</div>';
+ return;
+ }
+ self._boardRows(schoolList.slice(0, 10), true);
+ }).catch(function (e) {
+ document.getElementById('board-list').innerHTML =
+ '<div class="panel" style="text-align:center;padding:20px;color:#ef4444">' +
+ ' <b>Gagal memuat</b><br>' +
+ '<small>' + (e && e.message ? String(e.message).slice(0, 80) : 'coba lagi nanti') + '</small>' +
+ '</div>';
+ });
+ }
  return;
  }
  let rows = list;
