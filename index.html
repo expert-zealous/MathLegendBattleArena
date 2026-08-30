@@ -7574,5 +7574,888 @@ setTimeout(function(){
   }
 })();
 </script>
+<style>
+/* ================= PATCH 4.4: FRIEND INVITE / ACCEPT ================= */
+.friend-invite-box{
+  background:#f8fafc;
+  border:2px solid #e2e8f0;
+  border-radius:14px;
+  padding:10px;
+  margin:8px 0;
+}
+.friend-section-title{
+  font-size:12px;
+  font-weight:900;
+  color:#64748b;
+  letter-spacing:.5px;
+  margin:10px 0 6px;
+}
+.friend-request{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 0;
+  border-bottom:1px solid #e2e8f0;
+}
+.friend-request:last-child{border-bottom:none}
+.friend-request .fr-info{flex:1;min-width:0}
+.friend-request .fr-name{
+  font-weight:900;
+  font-size:13px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.friend-request .fr-sub{
+  font-size:11px;
+  color:#64748b;
+  font-weight:700;
+}
+.friend-request .fr-actions{
+  display:flex;
+  gap:5px;
+}
+.friend-request .fr-actions button{
+  border:none;
+  border-radius:9px;
+  padding:6px 8px;
+  font-size:11px;
+  font-weight:900;
+  cursor:pointer;
+}
+.friend-request .fr-accept{
+  background:#dcfce7;
+  color:#15803d;
+}
+.friend-request .fr-reject{
+  background:#fee2e2;
+  color:#dc2626;
+}
+.friend-empty{
+  font-size:12px;
+  color:#64748b;
+  font-weight:700;
+  text-align:center;
+  padding:8px 4px;
+}
+.friend-small-note{
+  font-size:11px;
+  line-height:1.45;
+  color:#64748b;
+  margin-top:6px;
+}
+</style>
+
+<script>
+/* ============================================================
+   PATCH 4.4 — Undangan Pertemanan Dua Arah
+   - Masukkan kode teman = kirim undangan
+   - Penerima menerima undangan
+   - Setelah diterima, muncul otomatis di kedua papan skor teman
+   - Aman ditaruh setelah Patch 4.3C
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function waitReady() {
+    if (!window.ML || !ML.UI || !ML.Player || !ML.Backend || !ML.Rules || !ML.DATA) {
+      return setTimeout(waitReady, 60);
+    }
+    installFriendInvitePatch();
+  }
+
+  function installFriendInvitePatch() {
+    if (ML._friendInvitePatch44) return;
+    ML._friendInvitePatch44 = true;
+
+    const UI = ML.UI;
+    const P  = ML.Player;
+    const B  = ML.Backend;
+    const U  = ML.util;
+    const D  = ML.DATA;
+    const R  = ML.Rules;
+    const AU = ML.Audio;
+
+    const BOARD_LIMIT = 10;
+    const MAX_ACCEPTED_READ = 120;
+
+    function el(id) {
+      return document.getElementById(id);
+    }
+
+    function uid() {
+      return B && B.user && B.user.uid ? B.user.uid : '';
+    }
+
+    function fbReady() {
+      return !!(B && B.online && B._fb && B._fb.fs && B._fb.db && uid());
+    }
+
+    function cleanCode(s) {
+      return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    }
+
+    function cleanSchool(s) {
+      return String(s || '').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 30);
+    }
+
+    function ensureFriendCode() {
+      if (P.data.friendCode) return P.data.friendCode;
+      const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let c = '';
+      for (let i = 0; i < 6; i++) c += ABC[Math.floor(Math.random() * ABC.length)];
+      P.data.friendCode = c;
+      P.save();
+      return c;
+    }
+
+    function meBasic() {
+      return {
+        uid: uid(),
+        name: P.data.name || 'PEMAIN',
+        hero: P.data.hero || 'raka',
+        mr: Number(P.data.mr) || 1000,
+        level: R.levelFromXP(P.data.xp).level,
+        code: ensureFriendCode()
+      };
+    }
+
+    function safeText(s, n) {
+      return String(s || '').slice(0, n || 40);
+    }
+
+    function pairId(a, b) {
+      return [String(a), String(b)].sort().join('_');
+    }
+
+    function heroSmall(heroId) {
+      const h = D.heroes.find(function (x) { return x.id === heroId; }) || D.heroes[0];
+      if (h && h.img) {
+        return '<img class="hero-img" src="' + h.img + '" alt="' + U.esc(h.name) + '" draggable="false">';
+      }
+      return h ? h.emoji : '';
+    }
+
+    function submitMyScore() {
+      if (!fbReady() || !B.submitScore) return Promise.resolve(false);
+      return B.submitScore({
+        name: P.data.name || 'PEMAIN',
+        hero: P.data.hero || 'raka',
+        mr: Number(P.data.mr) || 1000,
+        level: R.levelFromXP(P.data.xp).level,
+        school: cleanSchool(P.data.school),
+        friendCode: ensureFriendCode()
+      });
+    }
+
+    function requestRef(targetUid, fromUid) {
+      const fb = B._fb;
+      return fb.fs.doc(fb.db, 'friendInbox', targetUid, 'requests', fromUid);
+    }
+
+    function linkRef(a, b) {
+      const fb = B._fb;
+      return fb.fs.doc(fb.db, 'friendLinks', pairId(a, b));
+    }
+
+    /* ---------- Cari pemain berdasarkan kode teman ---------- */
+    B.findByFriendCode = async function (code) {
+      const want = cleanCode(code);
+      if (!fbReady() || !want) return null;
+
+      try {
+        const fb = this._fb;
+        const q = fb.fs.query(
+          fb.fs.collection(fb.db, 'leaderboard'),
+          fb.fs.where('friendCode', '==', want),
+          fb.fs.limit(1)
+        );
+
+        const snap = await fb.fs.getDocs(q);
+        let found = null;
+
+        snap.forEach(function (docSnap) {
+          if (found) return;
+          const v = docSnap.data() || {};
+          found = {
+            uid: docSnap.id,
+            name: safeText(v.name || 'PEMAIN', 12),
+            hero: v.hero || 'raka',
+            mr: typeof v.mr === 'number' ? v.mr : 1000,
+            level: v.level || 1,
+            friendCode: v.friendCode || want
+          };
+        });
+
+        return found;
+      } catch (e) {
+        this._lastError = String((e && (e.code || e.message)) || e);
+        console.warn('[ML findByFriendCode 4.4]', this._lastError, e);
+        return null;
+      }
+    };
+
+    /* ---------- Ambil daftar undangan masuk ---------- */
+    B.friendIncomingRequests = async function () {
+      if (!fbReady()) return [];
+      try {
+        const fb = this._fb;
+        const q = fb.fs.query(
+          fb.fs.collection(fb.db, 'friendInbox', uid(), 'requests'),
+          fb.fs.limit(30)
+        );
+
+        const snap = await fb.fs.getDocs(q);
+        const out = [];
+
+        snap.forEach(function (docSnap) {
+          const v = docSnap.data() || {};
+          if (!v.fromUid) return;
+          out.push({
+            uid: v.fromUid,
+            name: v.fromName || 'PEMAIN',
+            code: v.fromCode || '',
+            hero: v.fromHero || 'raka',
+            mr: v.fromMr || 1000,
+            level: v.fromLevel || 1,
+            createdAt: v.createdAt || 0
+          });
+        });
+
+        out.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        return out;
+      } catch (e) {
+        console.warn('[ML friendIncomingRequests]', e);
+        return null;
+      }
+    };
+
+    /* ---------- Ambil daftar teman yang sudah diterima ---------- */
+    B.acceptedFriends = async function () {
+      if (!fbReady()) return [];
+
+      try {
+        const fb = this._fb;
+        const myUid = uid();
+
+        const q = fb.fs.query(
+          fb.fs.collection(fb.db, 'friendLinks'),
+          fb.fs.where('members', 'array-contains', myUid),
+          fb.fs.limit(MAX_ACCEPTED_READ)
+        );
+
+        const snap = await fb.fs.getDocs(q);
+        const out = [];
+
+        snap.forEach(function (docSnap) {
+          const v = docSnap.data() || {};
+          const otherUid = v.aUid === myUid ? v.bUid : v.aUid;
+          if (!otherUid) return;
+
+          out.push({
+            uid: otherUid,
+            name: v.aUid === myUid ? (v.bName || 'PEMAIN') : (v.aName || 'PEMAIN'),
+            code: v.aUid === myUid ? (v.bCode || '') : (v.aCode || ''),
+            createdAt: v.createdAt || 0
+          });
+        });
+
+        out.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        return out;
+      } catch (e) {
+        console.warn('[ML acceptedFriends]', e);
+        return null;
+      }
+    };
+
+    /* ---------- Ambil skor teman berdasarkan UID ---------- */
+    B.friendScores = async function (uids) {
+      if (!fbReady() || !uids || !uids.length) return [];
+
+      try {
+        const fb = this._fb;
+        const selfUid = uid();
+        const list = uids.filter(Boolean).slice(0, MAX_ACCEPTED_READ);
+
+        const snaps = await Promise.all(list.map(function (u) {
+          return fb.fs.getDoc(fb.fs.doc(fb.db, 'leaderboard', u)).catch(function () { return null; });
+        }));
+
+        const out = [];
+
+        snaps.forEach(function (snap, i) {
+          if (!snap || !snap.exists()) return;
+          const v = snap.data() || {};
+          if (typeof v.mr !== 'number') return;
+
+          out.push({
+            uid: list[i],
+            name: safeText(v.name || 'PEMAIN', 12),
+            hero: v.hero || 'raka',
+            mr: Math.max(0, Math.min(9999, Math.round(v.mr))),
+            level: v.level || 1,
+            friendCode: v.friendCode || '',
+            me: list[i] === selfUid
+          });
+        });
+
+        return out;
+      } catch (e) {
+        console.warn('[ML friendScores 4.4]', e);
+        return null;
+      }
+    };
+
+    /* ---------- Kirim undangan teman ---------- */
+    async function sendFriendInvite(code) {
+      if (!fbReady()) {
+        UI.toast('🔌 Fitur teman butuh mode online');
+        return false;
+      }
+
+      code = cleanCode(code);
+      if (code.length < 4) {
+        UI.toast('Kode teman minimal 4 karakter');
+        return false;
+      }
+
+      const my = meBasic();
+
+      if (code === cleanCode(my.code)) {
+        UI.toast('Itu kode milikmu sendiri 😅');
+        return false;
+      }
+
+      await submitMyScore().catch(function () {});
+
+      const target = await B.findByFriendCode(code);
+
+      if (!target || !target.uid) {
+        UI.toast('❌ Kode ' + code + ' tidak ditemukan. Pastikan temanmu sudah pernah online.');
+        return false;
+      }
+
+      if (target.uid === my.uid) {
+        UI.toast('Itu akunmu sendiri 😅');
+        return false;
+      }
+
+      const fb = B._fb;
+
+      /* Jika sudah berteman, jangan kirim ulang */
+      const linkSnap = await fb.fs.getDoc(linkRef(my.uid, target.uid)).catch(function () { return null; });
+      if (linkSnap && linkSnap.exists()) {
+        UI.toast('✅ Kamu sudah berteman dengan ' + target.name);
+        return true;
+      }
+
+      /*
+        Jika ternyata target sudah pernah mengirim undangan ke saya,
+        maka memasukkan kode target dianggap menerima undangan itu.
+      */
+      const reverseReq = await fb.fs.getDoc(requestRef(my.uid, target.uid)).catch(function () { return null; });
+      if (reverseReq && reverseReq.exists()) {
+        await acceptFriendRequest(target.uid);
+        UI.toast('✅ Undangan diterima. Sekarang kamu dan ' + target.name + ' berteman!');
+        return true;
+      }
+
+      const req = requestRef(target.uid, my.uid);
+
+      await fb.fs.setDoc(req, {
+        fromUid: my.uid,
+        fromName: safeText(my.name, 12),
+        fromCode: my.code,
+        fromHero: my.hero,
+        fromMr: my.mr,
+        fromLevel: my.level,
+
+        toUid: target.uid,
+        toName: safeText(target.name, 12),
+        toCode: target.friendCode || code,
+
+        status: 'pending',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }, { merge: true });
+
+      UI.toast('📨 Undangan dikirim ke ' + target.name + '. Tunggu diterima.');
+      return true;
+    }
+
+    /* ---------- Terima undangan ---------- */
+    async function acceptFriendRequest(fromUid) {
+      if (!fbReady() || !fromUid) return false;
+
+      const fb = B._fb;
+      const my = meBasic();
+      const req = requestRef(my.uid, fromUid);
+      const snap = await fb.fs.getDoc(req);
+
+      if (!snap.exists()) {
+        UI.toast('Undangan tidak ditemukan / sudah diproses');
+        return false;
+      }
+
+      const r = snap.data() || {};
+
+      const aFirst = String(my.uid) < String(fromUid);
+
+      const linkData = {
+        members: [my.uid, fromUid].sort(),
+
+        aUid: aFirst ? my.uid : fromUid,
+        bUid: aFirst ? fromUid : my.uid,
+
+        aName: aFirst ? safeText(my.name, 12) : safeText(r.fromName || 'PEMAIN', 12),
+        bName: aFirst ? safeText(r.fromName || 'PEMAIN', 12) : safeText(my.name, 12),
+
+        aCode: aFirst ? my.code : (r.fromCode || ''),
+        bCode: aFirst ? (r.fromCode || '') : my.code,
+
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      await fb.fs.setDoc(linkRef(my.uid, fromUid), linkData, { merge: true });
+
+      await fb.fs.deleteDoc(req).catch(function () {});
+
+      /*
+        Jika ada request silang, hapus juga supaya tidak dobel.
+      */
+      await fb.fs.deleteDoc(requestRef(fromUid, my.uid)).catch(function () {});
+
+      syncAcceptedFriendsLocal().catch(function () {});
+
+      if (AU) AU.play('coin');
+      UI.toast('✅ Sekarang berteman dengan ' + (r.fromName || 'pemain ini'));
+      return true;
+    }
+
+    /* ---------- Tolak undangan ---------- */
+    async function rejectFriendRequest(fromUid) {
+      if (!fbReady() || !fromUid) return false;
+      const fb = B._fb;
+      await fb.fs.deleteDoc(requestRef(uid(), fromUid)).catch(function () {});
+      UI.toast('Undangan ditolak');
+      return true;
+    }
+
+    /* ---------- Hapus teman ---------- */
+    async function removeAcceptedFriend(friendUid) {
+      if (!fbReady() || !friendUid) return false;
+      const fb = B._fb;
+
+      await fb.fs.deleteDoc(linkRef(uid(), friendUid)).catch(function () {});
+
+      if (Array.isArray(P.data.friends)) {
+        P.data.friends = P.data.friends.filter(function (f) { return f && f.uid !== friendUid; });
+        P.save();
+      }
+
+      UI.toast('Teman dihapus');
+      return true;
+    }
+
+    /* ---------- Sinkron accepted friend ke local profile ---------- */
+    async function syncAcceptedFriendsLocal() {
+      if (!fbReady()) return [];
+      const accepted = await B.acceptedFriends();
+      if (!accepted) return [];
+
+      P.data.friends = accepted.map(function (f) {
+        return {
+          uid: f.uid,
+          name: f.name || 'Pemain',
+          code: f.code || ''
+        };
+      });
+
+      P.save();
+      return P.data.friends;
+    }
+
+    function drawFriendRows(rows) {
+      const box = el('board-list');
+      if (!box) return;
+
+      box.insertAdjacentHTML('beforeend', rows.map(function (r, i) {
+        return '<div class="board-row' + (r.me ? ' me' : '') + '">' +
+          '<span class="b-rank">' + (i + 1) + '</span>' +
+          '<span class="b-ava">' + heroSmall(r.hero) + '</span>' +
+          '<span class="b-name">' + (r.me ? '⭐ ' : '') + U.esc(r.name || 'PEMAIN') +
+            '<small>Lv ' + (r.level || 1) + ' • online</small></span>' +
+          '<span class="b-mr">' + Math.round(r.mr || 0) + ' MR</span>' +
+        '</div>';
+      }).join(''));
+    }
+
+    function myScoreEntry() {
+      return {
+        uid: uid(),
+        name: P.data.name || 'PEMAIN',
+        hero: P.data.hero || 'raka',
+        mr: Number(P.data.mr) || 1000,
+        level: R.levelFromXP(P.data.xp).level,
+        me: true
+      };
+    }
+
+    /* ---------- Render tab TEMAN baru: pakai accepted friend server ---------- */
+    function renderAcceptedFriendBoard() {
+      const box = el('board-list');
+      if (!box) return;
+
+      document.querySelectorAll('#board-tabs .tab').forEach(function (t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === 'friends');
+      });
+
+      const note = el('board-note');
+      if (note) {
+        note.textContent = 'Papan teman menampilkan teman yang sudah menerima undangan. Maksimal 10 teratas.';
+      }
+
+      const myCode = ensureFriendCode();
+
+      if (!fbReady()) {
+        box.innerHTML =
+          '<p class="page-desc small">Tab TEMAN membutuhkan mode online.<br>' +
+          'Kode temanmu: <b>' + U.esc(myCode) + '</b></p>';
+        return;
+      }
+
+      submitMyScore().catch(function () {});
+
+      box.innerHTML = '<p class="page-desc small">👥 Memuat daftar teman diterima…</p>';
+
+      B.acceptedFriends().then(function (accepted) {
+        if (UI.current !== 'leaderboard' || UI.boardTab !== 'friends') return;
+
+        if (accepted === null) {
+          box.innerHTML =
+            '<p class="page-desc small">⚠️ Gagal memuat daftar teman.<br>Cek Console/F12.</p>' +
+            '<button class="btn online wide" data-act="friend-center" style="margin-top:8px">👥 BUKA UNDANGAN TEMAN</button>';
+          return;
+        }
+
+        /*
+          Simpan ke local agar jumlah teman di profil ikut terupdate.
+        */
+        P.data.friends = accepted.map(function (f) {
+          return { uid: f.uid, name: f.name || 'Pemain', code: f.code || '' };
+        });
+        P.save();
+
+        if (!accepted.length) {
+          box.innerHTML =
+            '<p class="page-desc small">Belum ada teman yang diterima.<br>' +
+            'Kode temanmu: <b style="font-size:15px;letter-spacing:2px">' + U.esc(myCode) + '</b><br>' +
+            'Kirim undangan atau terima undangan teman.</p>' +
+            '<button class="btn online wide" data-act="friend-center" style="margin-top:8px">👥 UNDANGAN TEMAN</button>';
+          return;
+        }
+
+        const uids = accepted.map(function (f) { return f.uid; }).filter(Boolean);
+
+        B.friendScores(uids).then(function (scores) {
+          if (UI.current !== 'leaderboard' || UI.boardTab !== 'friends') return;
+
+          if (scores === null) {
+            box.innerHTML =
+              '<p class="page-desc small">⚠️ Gagal memuat skor teman.</p>' +
+              '<button class="btn ghost wide" data-act="friend-center" style="margin-top:8px">👥 UNDANGAN TEMAN</button>';
+            return;
+          }
+
+          let rows = (scores || []).slice();
+
+          /*
+            Papan teman umumnya menampilkan diri sendiri + teman.
+          */
+          if (!rows.some(function (r) { return r.me; })) {
+            rows.push(myScoreEntry());
+          }
+
+          rows.sort(function (a, b) { return b.mr - a.mr; });
+          rows = rows.slice(0, BOARD_LIMIT);
+
+          box.innerHTML =
+            '<p class="page-desc small" style="margin-bottom:6px">👥 ' +
+            accepted.length + ' teman diterima • menampilkan ' + rows.length + ' besar</p>';
+
+          drawFriendRows(rows);
+
+          box.insertAdjacentHTML('beforeend',
+            '<button class="btn ghost wide" data-act="friend-center" style="margin-top:10px">👥 UNDANGAN TEMAN</button>');
+        });
+      }).catch(function (e) {
+        console.warn('[ML friend board 4.4]', e);
+        box.innerHTML =
+          '<p class="page-desc small">⚠️ Gagal memuat papan teman.</p>' +
+          '<button class="btn ghost wide" data-act="friend-center" style="margin-top:8px">👥 UNDANGAN TEMAN</button>';
+      });
+    }
+
+    /* ---------- Override renderBoard hanya untuk tab friends ---------- */
+    if (!UI._origRenderBoard44) {
+      UI._origRenderBoard44 = UI.renderBoard.bind(UI);
+    }
+
+    UI.renderBoard = function () {
+      if (this.boardTab === 'friends') {
+        renderAcceptedFriendBoard();
+        return;
+      }
+      return UI._origRenderBoard44();
+    };
+
+    /* ---------- Modal pusat teman ---------- */
+    function openFriendCenter() {
+      const myCode = ensureFriendCode();
+
+      if (!fbReady()) {
+        UI.toast('🔌 Fitur undangan teman butuh mode online');
+        return;
+      }
+
+      submitMyScore().catch(function () {});
+
+      const bd = UI.modal(
+        '<h3>👥 Undangan Teman</h3>' +
+        '<p>Kode temanmu:</p>' +
+        '<div style="text-align:center"><span class="friend-code-display">' + U.esc(myCode) + '</span></div>' +
+        '<button class="btn ghost wide" data-f44="copy" style="margin:6px 0;font-size:12px">📋 SALIN KODE</button>' +
+
+        '<div class="friend-invite-box">' +
+          '<div class="friend-section-title">KIRIM UNDANGAN</div>' +
+          '<div style="display:flex;gap:6px;margin:4px 0">' +
+            '<input id="f44-code" maxlength="8" placeholder="KODE TEMAN" autocomplete="off" ' +
+            'style="flex:1;border:2px solid #e2e8f0;border-radius:10px;padding:9px;font-size:15px;' +
+            'font-weight:800;text-transform:uppercase;font-family:inherit;letter-spacing:2px">' +
+            '<button class="btn primary" data-f44="send" style="padding:9px 14px;font-size:13px">KIRIM</button>' +
+          '</div>' +
+          '<div class="friend-small-note">Masukkan kode teman untuk mengirim undangan. Teman harus menerima dulu agar menjadi teman dua arah.</div>' +
+        '</div>' +
+
+        '<div class="friend-section-title">PERMINTAAN MASUK</div>' +
+        '<div id="f44-requests"><div class="friend-empty">Memuat undangan…</div></div>' +
+
+        '<div class="friend-section-title">TEMAN DITERIMA</div>' +
+        '<div id="f44-accepted"><div class="friend-empty">Memuat teman…</div></div>' +
+
+        '<div class="m-actions" style="margin-top:10px">' +
+          '<button class="btn ghost" data-f44="close" style="grid-column:1/-1">TUTUP</button>' +
+        '</div>'
+      );
+
+      const input = bd.querySelector('#f44-code');
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 60);
+
+      function refreshModalLists() {
+        const reqBox = bd.querySelector('#f44-requests');
+        const accBox = bd.querySelector('#f44-accepted');
+
+        if (reqBox) reqBox.innerHTML = '<div class="friend-empty">Memuat undangan…</div>';
+        if (accBox) accBox.innerHTML = '<div class="friend-empty">Memuat teman…</div>';
+
+        B.friendIncomingRequests().then(function (reqs) {
+          if (!reqBox) return;
+
+          if (reqs === null) {
+            reqBox.innerHTML = '<div class="friend-empty">Gagal memuat undangan</div>';
+            return;
+          }
+
+          if (!reqs.length) {
+            reqBox.innerHTML = '<div class="friend-empty">Tidak ada undangan masuk</div>';
+            return;
+          }
+
+          reqBox.innerHTML = reqs.map(function (r) {
+            return '<div class="friend-request">' +
+              '<span class="b-ava" style="width:28px">' + heroSmall(r.hero) + '</span>' +
+              '<div class="fr-info">' +
+                '<div class="fr-name">' + U.esc(r.name || 'PEMAIN') + '</div>' +
+                '<div class="fr-sub">Kode: ' + U.esc(r.code || '-') + ' • MR ' + Math.round(r.mr || 1000) + '</div>' +
+              '</div>' +
+              '<div class="fr-actions">' +
+                '<button class="fr-accept" data-f44="accept" data-uid="' + U.esc(r.uid) + '">TERIMA</button>' +
+                '<button class="fr-reject" data-f44="reject" data-uid="' + U.esc(r.uid) + '">TOLAK</button>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+        });
+
+        B.acceptedFriends().then(function (friends) {
+          if (!accBox) return;
+
+          if (friends === null) {
+            accBox.innerHTML = '<div class="friend-empty">Gagal memuat teman</div>';
+            return;
+          }
+
+          P.data.friends = (friends || []).map(function (f) {
+            return { uid: f.uid, name: f.name || 'Pemain', code: f.code || '' };
+          });
+          P.save();
+
+          if (!friends.length) {
+            accBox.innerHTML = '<div class="friend-empty">Belum ada teman diterima</div>';
+            return;
+          }
+
+          accBox.innerHTML = '<div class="friend-list">' + friends.map(function (f) {
+            return '<div class="friend-item">' +
+              '<span class="f-name">' + U.esc(f.name || 'Pemain') + '</span>' +
+              '<span class="f-code">' + U.esc(f.code || '') + '</span>' +
+              '<button class="f-remove" data-f44="remove" data-uid="' + U.esc(f.uid) + '">HAPUS</button>' +
+            '</div>';
+          }).join('') + '</div>';
+        });
+      }
+
+      function doSend() {
+        const code = cleanCode(input.value);
+        sendFriendInvite(code).then(function (ok) {
+          if (ok) {
+            input.value = '';
+            refreshModalLists();
+            if (UI.current === 'leaderboard' && UI.boardTab === 'friends') UI.renderBoard();
+          }
+        }).catch(function (err) {
+          console.warn('[ML send invite]', err);
+          UI.toast('⚠️ Gagal kirim undangan');
+        });
+      }
+
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') doSend();
+      });
+
+      bd.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-f44]');
+        if (!btn) return;
+
+        const act = btn.getAttribute('data-f44');
+
+        if (act === 'close') {
+          UI.closeModal();
+          if (UI.current === 'profile') UI.renderProfile();
+          if (UI.current === 'leaderboard') UI.renderBoard();
+          return;
+        }
+
+        if (act === 'copy') {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(myCode)
+              .then(function () { UI.toast('📋 Kode ' + myCode + ' disalin!'); })
+              .catch(function () { UI.toast('Kode: ' + myCode); });
+          } else {
+            UI.toast('Kode: ' + myCode);
+          }
+          return;
+        }
+
+        if (act === 'send') {
+          doSend();
+          return;
+        }
+
+        if (act === 'accept') {
+          const fromUid = btn.getAttribute('data-uid');
+          acceptFriendRequest(fromUid).then(function () {
+            refreshModalLists();
+            if (UI.current === 'leaderboard' && UI.boardTab === 'friends') UI.renderBoard();
+          }).catch(function (err) {
+            console.warn('[ML accept friend]', err);
+            UI.toast('⚠️ Gagal menerima undangan');
+          });
+          return;
+        }
+
+        if (act === 'reject') {
+          const fromUid = btn.getAttribute('data-uid');
+          rejectFriendRequest(fromUid).then(function () {
+            refreshModalLists();
+          }).catch(function () {
+            UI.toast('⚠️ Gagal menolak undangan');
+          });
+          return;
+        }
+
+        if (act === 'remove') {
+          const friendUid = btn.getAttribute('data-uid');
+          removeAcceptedFriend(friendUid).then(function () {
+            refreshModalLists();
+            if (UI.current === 'leaderboard' && UI.boardTab === 'friends') UI.renderBoard();
+          }).catch(function () {
+            UI.toast('⚠️ Gagal menghapus teman');
+          });
+        }
+      });
+
+      refreshModalLists();
+    }
+
+    /*
+      Patch tombol lama "manage-friends" menjadi "friend-center".
+      Ini penting karena patch 4.3C lama masih punya event sendiri.
+    */
+    function retargetFriendButtons(root) {
+      (root || document).querySelectorAll('[data-act="manage-friends"]').forEach(function (btn) {
+        btn.setAttribute('data-act', 'friend-center');
+        if (/KELOLA|TAMBAH/i.test(btn.textContent || '')) {
+          btn.textContent = '👥 UNDANGAN TEMAN';
+        }
+      });
+    }
+
+    if (!UI._origRenderProfile44 && UI.renderProfile) {
+      UI._origRenderProfile44 = UI.renderProfile.bind(UI);
+      UI.renderProfile = function () {
+        UI._origRenderProfile44();
+        retargetFriendButtons(document);
+      };
+    }
+
+    /*
+      MutationObserver memastikan tombol lama yang muncul dari render berikutnya
+      ikut diganti sebelum diklik.
+    */
+    try {
+      const mo = new MutationObserver(function () {
+        retargetFriendButtons(document);
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
+
+    document.addEventListener('click', function (e) {
+      const t = e.target.closest('[data-act]');
+      if (!t) return;
+
+      const act = t.getAttribute('data-act');
+
+      if (act === 'friend-center') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openFriendCenter();
+        return;
+      }
+    }, true);
+
+    ensureFriendCode();
+    retargetFriendButtons(document);
+
+    console.log('[ML] Patch 4.4 friend invite aktif');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitReady);
+  } else {
+    waitReady();
+  }
+})();
+</script>
 </body>
 </html>
