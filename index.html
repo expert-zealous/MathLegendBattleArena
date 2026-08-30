@@ -10803,5 +10803,614 @@ body {
   }
 })();
 </script>
+<style id="ml-ui-stage4-6">
+/* ============================================================
+   UI TAHAP 4: LEADERBOARD & SOSIAL POLISH
+   UI TAHAP 6: RESULT SCREEN GAME-LIKE
+   ============================================================ */
+
+/* ═══════════════ LEADERBOARD ═══════════════ */
+
+/* Tab selector lebih game-like */
+.board-tabs {
+  gap: 6px !important;
+  background: rgba(255,255,255,.7);
+  border-radius: 16px;
+  padding: 4px;
+  box-shadow: inset 0 1px 4px rgba(15,23,42,.06);
+}
+
+.board-tabs .tab {
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 10px 6px !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: .5px !important;
+  color: #64748b !important;
+  background: transparent !important;
+  transition: all .2s ease !important;
+}
+
+.board-tabs .tab.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(99,102,241,.30) !important;
+}
+
+/* Baris leaderboard */
+.board-row {
+  border-radius: 16px !important;
+  padding: 10px 14px !important;
+  margin-bottom: 8px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,252,.92)) !important;
+  border: 1.5px solid rgba(226,232,240,.7) !important;
+  box-shadow: 0 3px 10px rgba(15,23,42,.05) !important;
+  transition: transform .1s ease !important;
+}
+
+.board-row:active {
+  transform: scale(.98);
+}
+
+.board-row.me {
+  border: 2px solid #818cf8 !important;
+  background: linear-gradient(180deg, rgba(238,242,255,.98), rgba(224,231,255,.92)) !important;
+  box-shadow: 0 4px 16px rgba(99,102,241,.14) !important;
+}
+
+/* Top 1, 2, 3 istimewa */
+.board-row:nth-child(1) .b-rank,
+.board-row:nth-child(2) .b-rank,
+.board-row:nth-child(3) .b-rank {
+  width: 36px !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+  color: #fff !important;
+}
+
+.board-row:nth-child(1) .b-rank {
+  background: linear-gradient(135deg, #f59e0b, #f97316) !important;
+  box-shadow: 0 4px 12px rgba(245,158,11,.35) !important;
+}
+
+.board-row:nth-child(2) .b-rank {
+  background: linear-gradient(135deg, #94a3b8, #64748b) !important;
+  box-shadow: 0 4px 12px rgba(100,116,139,.30) !important;
+}
+
+.board-row:nth-child(3) .b-rank {
+  background: linear-gradient(135deg, #d97706, #b45309) !important;
+  box-shadow: 0 4px 12px rgba(180,83,9,.30) !important;
+}
+
+/* Top 1 lebih besar */
+.board-row:nth-child(1) {
+  padding: 14px 16px !important;
+  background: linear-gradient(135deg, rgba(255,251,235,.98), rgba(254,243,199,.90)) !important;
+  border: 2px solid rgba(251,191,36,.5) !important;
+  box-shadow: 0 6px 20px rgba(245,158,11,.18) !important;
+}
+
+.board-row:nth-child(1) .b-name {
+  font-size: 15px !important;
+  font-weight: 1000 !important;
+}
+
+.board-row:nth-child(1) .b-mr {
+  font-size: 16px !important;
+  color: #b45309 !important;
+}
+
+.board-row:nth-child(1) .b-ava {
+  font-size: 24px !important;
+  width: 32px !important;
+}
+
+/* Rank 4+ normal */
+.board-row .b-rank {
+  font-size: 14px !important;
+  font-weight: 1000 !important;
+  color: #94a3b8 !important;
+  width: 32px !important;
+}
+
+.board-row .b-name {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.board-row .b-name small {
+  font-size: 10px !important;
+  color: #94a3b8 !important;
+}
+
+.board-row .b-mr {
+  font-size: 14px !important;
+  font-weight: 1000 !important;
+  color: #4f46e5 !important;
+}
+
+.board-row .b-ava {
+  width: 28px !important;
+  font-size: 22px !important;
+}
+
+/* ═══════════════ PROFIL SOSIAL POLISH ═══════════════ */
+
+/* Kode teman lebih game-like */
+.friend-code-display {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff) !important;
+  border: 2px dashed #818cf8 !important;
+  color: #4338ca !important;
+  border-radius: 14px !important;
+  padding: 6px 14px !important;
+  font-size: 18px !important;
+  letter-spacing: 4px !important;
+  box-shadow: 0 4px 12px rgba(99,102,241,.10);
+}
+
+/* Panel sosial di profil */
+.pf-social {
+  gap: 10px !important;
+}
+
+.pf-social-row {
+  padding: 8px 0 !important;
+  border-bottom: 1px solid rgba(226,232,240,.6);
+}
+
+.pf-social-row:last-child {
+  border-bottom: none;
+}
+
+.pf-social-row .pf-label {
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: .3px;
+}
+
+.pf-social-row .pf-val {
+  font-size: 13px !important;
+}
+
+/* Friend modal polish */
+.friend-request {
+  border-radius: 14px !important;
+  padding: 10px !important;
+  margin-bottom: 6px !important;
+  background: linear-gradient(180deg, rgba(248,250,252,.95), rgba(241,245,249,.90));
+  border: 1px solid rgba(226,232,240,.7) !important;
+}
+
+.friend-request .fr-accept {
+  border-radius: 10px !important;
+  padding: 7px 12px !important;
+  font-size: 12px !important;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0) !important;
+  color: #15803d !important;
+  box-shadow: 0 2px 8px rgba(16,185,129,.15);
+}
+
+.friend-request .fr-reject {
+  border-radius: 10px !important;
+  padding: 7px 10px !important;
+  font-size: 12px !important;
+  background: linear-gradient(135deg, #fee2e2, #fecaca) !important;
+  color: #dc2626 !important;
+}
+
+.friend-item {
+  padding: 8px 4px !important;
+  border-bottom: 1px solid rgba(241,245,249,.9) !important;
+}
+
+.friend-item .f-name {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.friend-item .f-remove {
+  border-radius: 10px !important;
+  padding: 5px 10px !important;
+  font-size: 11px !important;
+}
+
+/* ═══════════════ RESULT SCREEN GAME-LIKE ═══════════════ */
+
+/* Banner lebih dramatis */
+#screen-result .res-banner {
+  border-radius: 24px !important;
+  padding: 24px 14px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+#screen-result .res-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,.15), transparent 50%),
+    radial-gradient(circle at 80% 30%, rgba(255,255,255,.10), transparent 40%);
+  pointer-events: none;
+}
+
+#screen-result .res-banner::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255,255,255,.08) 50%,
+    transparent 70%
+  );
+  animation: resultShine 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes resultShine {
+  0% { transform: translateX(-100%) rotate(25deg); }
+  50%, 100% { transform: translateX(100%) rotate(25deg); }
+}
+
+#screen-result .res-banner.win {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 35%, #ef4444 100%) !important;
+  box-shadow:
+    0 12px 36px rgba(245,158,11,.40),
+    0 0 60px rgba(249,115,22,.15),
+    inset 0 2px 0 rgba(255,255,255,.25) !important;
+}
+
+#screen-result .res-banner.lose {
+  background: linear-gradient(135deg, #374151 0%, #4b5563 50%, #6b7280 100%) !important;
+  box-shadow: 0 12px 30px rgba(55,65,81,.35) !important;
+}
+
+#screen-result .res-banner.draw {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%) !important;
+  box-shadow: 0 12px 30px rgba(99,102,241,.35) !important;
+}
+
+/* Confetti lebih besar */
+#screen-result .confetti {
+  width: 12px !important;
+  height: 18px !important;
+  border-radius: 3px !important;
+}
+
+/* Sub-teks di bawah banner */
+#screen-result .res-sub {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  color: #475569 !important;
+  text-align: center !important;
+  padding: 2px 10px !important;
+}
+
+/* Reward & Stats grid */
+#screen-result .res-grid {
+  gap: 10px !important;
+}
+
+#screen-result .res-box {
+  border-radius: 20px !important;
+  padding: 16px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,252,.92)) !important;
+  border: 1px solid rgba(255,255,255,.9) !important;
+  box-shadow:
+    0 6px 18px rgba(15,23,42,.06),
+    inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+#screen-result .res-box h3 {
+  font-size: 13px !important;
+  letter-spacing: 1.5px !important;
+  color: #475569 !important;
+  margin-bottom: 10px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 2px dashed rgba(226,232,240,.7);
+}
+
+/* Reward baris */
+#screen-result .rw-row {
+  font-size: 13px !important;
+  padding: 4px 0 !important;
+}
+
+#screen-result .rw-row.total {
+  font-size: 16px !important;
+  margin-top: 8px !important;
+  padding-top: 10px !important;
+  border-top: 2px dashed #c7d2fe !important;
+  color: #4f46e5 !important;
+}
+
+#screen-result .rw-row .up {
+  color: #059669 !important;
+  font-weight: 1000 !important;
+}
+
+#screen-result .rw-row .down {
+  color: #dc2626 !important;
+}
+
+#screen-result .rw-note {
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  padding: 6px 10px !important;
+  margin-top: 8px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #fef3c7, #fde68a) !important;
+  color: #92400e !important;
+  text-align: center !important;
+  box-shadow: 0 3px 10px rgba(245,158,11,.12);
+}
+
+/* Stat cells */
+#screen-result .stat-cell {
+  border-radius: 16px !important;
+  padding: 12px 10px !important;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9) !important;
+  border: 1px solid rgba(226,232,240,.6) !important;
+  text-align: center !important;
+}
+
+#screen-result .stat-cell b {
+  font-size: 22px !important;
+  font-weight: 1000 !important;
+  color: #0f172a !important;
+  display: block !important;
+}
+
+#screen-result .stat-cell span {
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  letter-spacing: .8px !important;
+  color: #64748b !important;
+}
+
+/* Topic bars */
+#screen-result .topic-row .t-head {
+  font-size: 13px !important;
+}
+
+#screen-result .tbar {
+  height: 12px !important;
+  border-radius: 99px !important;
+  background: linear-gradient(180deg, #e2e8f0, #cbd5e1) !important;
+}
+
+#screen-result .tfill {
+  border-radius: 99px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+/* Rekomendasi */
+#screen-result .res-reco {
+  border-radius: 20px !important;
+}
+
+#screen-result .res-reco .reco-title {
+  font-size: 14px !important;
+  font-weight: 1000 !important;
+}
+
+/* Unlock row */
+#screen-result .unlock-row {
+  padding: 8px 4px !important;
+  border-bottom: 1px solid rgba(226,232,240,.6);
+  gap: 12px !important;
+}
+
+#screen-result .unlock-row:last-child {
+  border-bottom: none;
+}
+
+#screen-result .unlock-row .u-icon {
+  font-size: 24px !important;
+}
+
+#screen-result .unlock-row .u-rw {
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  color: #059669 !important;
+}
+
+/* Pembahasan toggle */
+#screen-result .wrong-toggle {
+  border-radius: 14px !important;
+  padding: 12px !important;
+  font-size: 13px !important;
+  background: linear-gradient(180deg, #eef2ff, #e0e7ff) !important;
+  color: #4338ca !important;
+  border: 1px solid rgba(165,180,252,.4) !important;
+}
+
+#screen-result .wrong-item {
+  padding: 10px 0 !important;
+}
+
+#screen-result .wrong-item .w-q {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+#screen-result .wrong-item .w-a {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  color: #059669 !important;
+}
+
+#screen-result .wrong-item .w-e {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  color: #475569 !important;
+}
+
+/* Tombol actions bawah */
+#screen-result .res-actions {
+  gap: 10px !important;
+  margin-top: 4px !important;
+}
+
+#screen-result .res-actions .btn {
+  border-radius: 18px !important;
+  padding: 16px !important;
+  font-size: 15px !important;
+  font-weight: 1000 !important;
+  letter-spacing: .5px !important;
+}
+
+#screen-result .res-actions .btn.primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  box-shadow: 0 6px 20px rgba(99,102,241,.35) !important;
+}
+
+#screen-result .res-actions .btn.ghost {
+  background: linear-gradient(180deg, #fff, #f8fafc) !important;
+  border: 2px solid #c7d2fe !important;
+  color: #4f46e5 !important;
+}
+
+/* ═══════════════ ACHIEVEMENT POLISH ═══════════════ */
+
+.ach {
+  border-radius: 18px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,252,.92)) !important;
+  border: 2px solid transparent !important;
+}
+
+.ach.unlocked {
+  border-color: #fde68a !important;
+  background: linear-gradient(180deg, rgba(255,251,235,.98), rgba(254,243,199,.90)) !important;
+  box-shadow: 0 4px 14px rgba(245,158,11,.14) !important;
+}
+
+.ach .a-icon {
+  font-size: 32px !important;
+}
+
+.ach .a-name {
+  font-size: 13px !important;
+  font-weight: 1000 !important;
+}
+
+.ach .a-desc {
+  font-size: 11px !important;
+  line-height: 1.45 !important;
+}
+
+/* ═══════════════ MISI HARIAN POLISH ═══════════════ */
+
+.mission {
+  border-radius: 18px !important;
+  padding: 14px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,252,.92)) !important;
+}
+
+.mission .m-head .m-icon {
+  font-size: 24px !important;
+}
+
+.mission .m-head .m-title b {
+  font-size: 14px !important;
+}
+
+.mission .m-head .m-rw {
+  font-size: 11px !important;
+}
+
+.mission .m-done {
+  font-size: 12px !important;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+/* ═══════════════ TOKO ATRIBUT POLISH ═══════════════ */
+
+.gear-card {
+  border-radius: 18px !important;
+  padding: 14px !important;
+}
+
+.gear-card .g-icon {
+  font-size: 34px !important;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.10));
+}
+
+.gear-card .g-name {
+  font-size: 15px !important;
+  font-weight: 1000 !important;
+}
+
+.gear-card .g-buy .btn {
+  border-radius: 14px !important;
+  padding: 10px 10px !important;
+  font-size: 13px !important;
+}
+
+.pips i {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 4px !important;
+}
+
+.pips i.on {
+  background: linear-gradient(135deg, #f59e0b, #f97316) !important;
+  box-shadow: 0 2px 6px rgba(245,158,11,.35);
+}
+
+/* ═══════════════ PROFIL KARTU UTAMA ═══════════════ */
+
+.pf-card {
+  border-radius: 20px !important;
+  padding: 14px !important;
+}
+
+.pf-name {
+  font-size: 18px !important;
+  font-weight: 1000 !important;
+}
+
+.pf-sub {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.pf-rank {
+  font-size: 24px !important;
+  font-weight: 1000 !important;
+}
+
+/* Settings buttons */
+.pf-settings .btn {
+  border-radius: 16px !important;
+  padding: 14px !important;
+  font-size: 14px !important;
+}
+</style>
+
+<script>
+(function () {
+  'use strict';
+  function boot() {
+    if (!window.ML || !ML.UI) return setTimeout(boot, 50);
+    if (ML._uiStage46) return;
+    ML._uiStage46 = true;
+    console.log('[ML] UI Tahap 4+6 Leaderboard & Result polish aktif');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
 </body>
 </html>
