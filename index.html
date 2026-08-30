@@ -7137,5 +7137,442 @@ setTimeout(function(){
   }
 })();
 </script>
+<script>
+/* ============================================================
+   PATCH 4.3C — Papan Skor TEMAN (Firebase)
+   - Tab TEMAN membaca Firestore, bukan bot lokal
+   - Tambah teman via kode (query langsung, akurat di peringkat mana pun)
+   - Teman boleh banyak; papan skor menampilkan 10 MR tertinggi
+   - Aman ditumpuk di atas Patch 4.3B (sekolah)
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function waitReady() {
+    if (!window.ML || !ML.UI || !ML.Player || !ML.Backend || !ML.Rules || !ML.DATA) {
+      return setTimeout(waitReady, 60);
+    }
+    installFriendPatch();
+  }
+
+  function installFriendPatch() {
+    if (ML._friendPatch43C) return;
+    ML._friendPatch43C = true;
+
+    const UI = ML.UI;
+    const P  = ML.Player;
+    const B  = ML.Backend;
+    const U  = ML.util;
+    const D  = ML.DATA;
+    const R  = ML.Rules;
+    const AU = ML.Audio;
+
+    const MAX_FRIENDS   = 200;   // batas aman penyimpanan
+    const BOARD_LIMIT   = 10;    // yang tampil di papan skor
+    const CACHE_MS      = 60000; // cache skor teman
+
+    function el(id) { return document.getElementById(id); }
+
+    function cleanCode(s) {
+      return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    }
+
+    function cleanSchool(s) {
+      return String(s || '').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 30);
+    }
+
+    /* ---------- pastikan pemain punya kode teman ---------- */
+    function ensureFriendCode() {
+      if (P.data.friendCode) return P.data.friendCode;
+      const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let c = '';
+      for (let i = 0; i < 6; i++) c += ABC[Math.floor(Math.random() * ABC.length)];
+      P.data.friendCode = c;
+      P.save();
+      return c;
+    }
+
+    function friendsArr() {
+      if (!Array.isArray(P.data.friends)) P.data.friends = [];
+      return P.data.friends;
+    }
+
+    function heroSmall(heroId) {
+      const h = D.heroes.find(function (x) { return x.id === heroId; }) || D.heroes[0];
+      if (h && h.img) {
+        return '<img class="hero-img" src="' + h.img + '" alt="' + U.esc(h.name) + '" draggable="false">';
+      }
+      return h ? h.emoji : '';
+    }
+
+    function drawRows(rows) {
+      const box = el('board-list');
+      if (!box) return;
+      const html = rows.map(function (r, i) {
+        return '<div class="board-row' + (r.me ? ' me' : '') + '">' +
+          '<span class="b-rank">' + (i + 1) + '</span>' +
+          '<span class="b-ava">' + heroSmall(r.hero) + '</span>' +
+          '<span class="b-name">' + (r.me ? '⭐ ' : '') + U.esc(r.name || 'PEMAIN') +
+            '<small>Lv ' + (r.level || 1) + ' • online</small></span>' +
+          '<span class="b-mr">' + Math.round(r.mr || 0) + ' MR</span>' +
+        '</div>';
+      }).join('');
+      box.insertAdjacentHTML('beforeend', html);
+    }
+
+    function myEntry() {
+      return {
+        uid: (B.user && B.user.uid) || '',
+        name: P.data.name || 'PEMAIN',
+        hero: P.data.hero || 'raka',
+        mr: Number(P.data.mr) || 1000,
+        level: R.levelFromXP(P.data.xp).level,
+        friendCode: ensureFriendCode(),
+        me: true
+      };
+    }
+
+    /* ---------- kirim skor saya (termasuk friendCode) ---------- */
+    function submitMyScore() {
+      if (!B || !B.online || !B.submitScore) return Promise.resolve(false);
+      return B.submitScore({
+        name: P.data.name || 'PEMAIN',
+        hero: P.data.hero || 'raka',
+        mr: Number(P.data.mr) || 1000,
+        level: R.levelFromXP(P.data.xp).level,
+        school: cleanSchool(P.data.school),
+        friendCode: ensureFriendCode()
+      });
+    }
+
+    /* ---------- cari pemain berdasarkan kode teman (1 query) ---------- */
+    B.findByFriendCode = async function (code) {
+      const want = cleanCode(code);
+      if (!this.online || !this._fb || !want) return null;
+      try {
+        const fb = this._fb;
+        const q = fb.fs.query(
+          fb.fs.collection(fb.db, 'leaderboard'),
+          fb.fs.where('friendCode', '==', want),
+          fb.fs.limit(1)
+        );
+        const snap = await fb.fs.getDocs(q);
+        let found = null;
+        snap.forEach(function (d) {
+          if (found) return;
+          const v = d.data() || {};
+          found = {
+            uid: d.id,
+            name: String(v.name || 'PEMAIN').slice(0, 12),
+            hero: v.hero || 'raka',
+            mr: typeof v.mr === 'number' ? v.mr : 1000,
+            level: v.level || 1,
+            friendCode: v.friendCode || want
+          };
+        });
+        return found;
+      } catch (e) {
+        this._lastError = String((e && (e.code || e.message)) || e);
+        console.warn('[ML findByFriendCode]', this._lastError, e);
+        return null;
+      }
+    };
+
+    /* ---------- ambil skor teman: baca per UID + cache ---------- */
+    B._fCache43C = { t: 0, key: '', data: null };
+
+    B.friendScores = async function (uids) {
+      if (!this.online || !this._fb || !uids || !uids.length) return [];
+      const list = uids.filter(Boolean).slice(0, 80);
+      const key  = list.slice().sort().join(',');
+      const now  = Date.now();
+
+      if (this._fCache43C.data && this._fCache43C.key === key &&
+          (now - this._fCache43C.t) < CACHE_MS) {
+        return this._fCache43C.data;
+      }
+
+      try {
+        const fb = this._fb;
+        const selfUid = this.user && this.user.uid;
+        const snaps = await Promise.all(list.map(function (u) {
+          return fb.fs.getDoc(fb.fs.doc(fb.db, 'leaderboard', u)).catch(function () { return null; });
+        }));
+
+        const out = [];
+        snaps.forEach(function (snap, i) {
+          if (!snap || !snap.exists()) return;
+          const v = snap.data() || {};
+          if (typeof v.mr !== 'number') return;
+          out.push({
+            uid: list[i],
+            name: String(v.name || 'PEMAIN').slice(0, 12),
+            hero: v.hero || 'raka',
+            mr: Math.max(0, Math.min(9999, Math.round(v.mr))),
+            level: v.level || 1,
+            friendCode: v.friendCode || '',
+            me: list[i] === selfUid
+          });
+        });
+
+        this._fCache43C = { t: now, key: key, data: out };
+        return out;
+      } catch (e) {
+        console.warn('[ML friendScores]', e);
+        return null;
+      }
+    };
+
+    function clearFriendCache() {
+      B._fCache43C = { t: 0, key: '', data: null };
+    }
+
+    /* ---------- perbaiki teman lama yang belum punya uid ---------- */
+    async function backfillUid() {
+      const list = friendsArr().filter(function (f) { return f && !f.uid && f.code; }).slice(0, 5);
+      if (!list.length) return false;
+      let changed = false;
+      for (const f of list) {
+        const found = await B.findByFriendCode(f.code);
+        if (found && found.uid) { f.uid = found.uid; f.name = found.name || f.name; changed = true; }
+      }
+      if (changed) { P.save(); clearFriendCache(); }
+      return changed;
+    }
+
+    /* ---------- render tab TEMAN ---------- */
+    function renderFriendsTab() {
+      const box = el('board-list');
+      if (!box) return;
+
+      document.querySelectorAll('#board-tabs .tab').forEach(function (t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === 'friends');
+      });
+
+      const note = el('board-note');
+      if (note) note.textContent = 'Papan teman memakai data online. Tersimpan bebas, tampil 10 MR tertinggi.';
+
+      const myCode = ensureFriendCode();
+      const friends = friendsArr();
+
+      if (!B.online) {
+        box.innerHTML =
+          '<p class="page-desc small">Tab TEMAN membutuhkan mode online.<br>' +
+          'Kode temanmu: <b>' + U.esc(myCode) + '</b></p>';
+        return;
+      }
+
+      if (!friends.length) {
+        box.innerHTML =
+          '<p class="page-desc small">Belum ada teman ditambahkan.<br>' +
+          'Kode temanmu: <b style="font-size:15px;letter-spacing:2px">' + U.esc(myCode) + '</b><br>' +
+          'Bagikan kode ini agar temanmu bisa menambahkanmu.</p>' +
+          '<button class="btn online wide" data-act="manage-friends" style="margin-top:8px">👥 TAMBAH TEMAN</button>';
+        submitMyScore().catch(function () {});
+        return;
+      }
+
+      box.innerHTML = '<p class="page-desc small">👥 Memuat ' + friends.length + ' teman…</p>';
+
+      backfillUid().then(function () {
+        const uids = friendsArr().map(function (f) { return f.uid; }).filter(Boolean);
+
+        if (!uids.length) {
+          box.innerHTML =
+            '<p class="page-desc small">Teman tersimpan, tetapi datanya belum ditemukan di server.<br>' +
+            'Minta temanmu menyelesaikan 1 pertandingan online.</p>' +
+            '<button class="btn ghost wide" data-act="manage-friends" style="margin-top:8px">👥 KELOLA TEMAN</button>';
+          return;
+        }
+
+        return B.friendScores(uids).then(function (list) {
+          if (UI.current !== 'leaderboard' || UI.boardTab !== 'friends') return;
+
+          if (list === null) {
+            box.innerHTML = '<p class="page-desc small">⚠️ Gagal memuat data teman. Cek Console (F12).</p>';
+            return;
+          }
+
+          let rows = list.slice();
+          if (!rows.some(function (r) { return r.me; })) {
+            rows.push(myEntry());
+            submitMyScore().catch(function () {});
+          }
+          rows.sort(function (a, b) { return b.mr - a.mr; });
+          rows = rows.slice(0, BOARD_LIMIT);
+
+          if (!rows.length) {
+            box.innerHTML =
+              '<p class="page-desc small">Teman-temanmu belum bermain online.</p>' +
+              '<button class="btn ghost wide" data-act="manage-friends" style="margin-top:8px">👥 KELOLA TEMAN</button>';
+            return;
+          }
+
+          box.innerHTML =
+            '<p class="page-desc small" style="margin-bottom:6px">👥 ' + friends.length +
+            ' teman • menampilkan ' + rows.length + ' besar</p>';
+          drawRows(rows);
+          box.insertAdjacentHTML('beforeend',
+            '<button class="btn ghost wide" data-act="manage-friends" style="margin-top:10px">👥 KELOLA TEMAN</button>');
+        });
+      }).catch(function (e) {
+        console.warn('[ML friends render]', e);
+        box.innerHTML = '<p class="page-desc small">⚠️ Gagal memuat data teman</p>';
+      });
+    }
+
+    /* ---------- rantai renderBoard: hanya ambil alih tab friends ---------- */
+    if (!UI._origRenderBoard43C) {
+      UI._origRenderBoard43C = UI.renderBoard.bind(UI);
+    }
+    UI.renderBoard = function () {
+      if (this.boardTab !== 'friends') return UI._origRenderBoard43C();
+      renderFriendsTab();
+    };
+
+    /* ---------- modal kelola teman ---------- */
+    function openFriendsModal() {
+      const myCode = ensureFriendCode();
+      const friends = friendsArr();
+
+      const listHtml = friends.length
+        ? '<div class="friend-list">' + friends.map(function (f, i) {
+            return '<div class="friend-item">' +
+              '<span class="f-name">' + U.esc(f.name || 'Pemain') + '</span>' +
+              '<span class="f-code">' + U.esc(f.code || '') + '</span>' +
+              '<button class="f-remove" data-fact="remove" data-idx="' + i + '">✕</button>' +
+            '</div>';
+          }).join('') + '</div>'
+        : '<p class="page-desc small" style="margin:6px 0">Belum ada teman</p>';
+
+      const bd = UI.modal(
+        '<h3>👥 Kelola Teman</h3>' +
+        '<p>Kode temanmu:</p>' +
+        '<div style="text-align:center"><span class="friend-code-display">' + U.esc(myCode) + '</span></div>' +
+        '<button class="btn ghost wide" data-fact="copy" style="margin:6px 0;font-size:12px">📋 SALIN KODE</button>' +
+        '<p style="margin-top:10px">Tambah teman dengan kode mereka:</p>' +
+        '<div style="display:flex;gap:6px;margin:4px 0">' +
+          '<input id="fc-input" maxlength="8" placeholder="KODE TEMAN" autocomplete="off" ' +
+          'style="flex:1;border:2px solid #e2e8f0;border-radius:10px;padding:9px;font-size:15px;' +
+          'font-weight:800;text-transform:uppercase;font-family:inherit;letter-spacing:2px">' +
+          '<button class="btn primary" data-fact="add" style="padding:9px 14px;font-size:13px">TAMBAH</button>' +
+        '</div>' +
+        '<div style="font-size:12px;font-weight:700;color:#64748b;margin:8px 0 2px">' +
+          'Daftar teman: ' + friends.length + ' orang ' +
+          '<span style="font-weight:600">— papan skor tampil 10 teratas</span></div>' +
+        listHtml +
+        '<div class="m-actions" style="margin-top:10px">' +
+          '<button class="btn ghost" data-fact="close" style="grid-column:1/-1">TUTUP</button></div>'
+      );
+
+      const input = bd.querySelector('#fc-input');
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 60);
+
+      function doAdd() {
+        const code = cleanCode(input.value);
+        if (code.length < 4) { UI.toast('Kode minimal 4 karakter'); return; }
+        if (code === myCode) { UI.toast('Itu kodemu sendiri 😅'); return; }
+        if (friendsArr().some(function (f) { return cleanCode(f.code) === code; })) {
+          UI.toast('Sudah ada di daftar teman'); return;
+        }
+        if (friendsArr().length >= MAX_FRIENDS) { UI.toast('Batas aman ' + MAX_FRIENDS + ' teman'); return; }
+        if (!B.online) { UI.toast('🔌 Butuh mode online'); return; }
+
+        UI.toast('🔎 Mencari kode ' + code + '…');
+        B.findByFriendCode(code).then(function (found) {
+          if (!found) {
+            UI.toast('❌ Kode ' + code + ' tidak ditemukan. Pastikan temanmu sudah main 1x online.');
+            return;
+          }
+          if (B.user && found.uid === B.user.uid) { UI.toast('Itu akunmu sendiri 😅'); return; }
+          if (friendsArr().some(function (f) { return f.uid && f.uid === found.uid; })) {
+            UI.toast('Sudah ada di daftar teman'); return;
+          }
+          friendsArr().push({ uid: found.uid, name: found.name, code: code });
+          P.save();
+          clearFriendCache();
+          if (AU) AU.play('coin');
+          UI.toast('✅ ' + found.name + ' ditambahkan!');
+          UI.closeModal();
+          openFriendsModal();
+        }).catch(function (err) {
+          UI.toast('⚠️ Gagal: ' + String(err).slice(0, 60));
+        });
+      }
+
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') doAdd(); });
+
+      bd.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-fact]');
+        if (!btn) return;
+        const act = btn.getAttribute('data-fact');
+
+        if (act === 'close') {
+          UI.closeModal();
+          if (UI.current === 'profile') UI.renderProfile();
+          if (UI.current === 'leaderboard') UI.renderBoard();
+          return;
+        }
+        if (act === 'copy') {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(myCode)
+              .then(function () { UI.toast('📋 Kode ' + myCode + ' disalin!'); })
+              .catch(function () { UI.toast('Kode: ' + myCode); });
+          } else UI.toast('Kode: ' + myCode);
+          return;
+        }
+        if (act === 'add') { doAdd(); return; }
+        if (act === 'remove') {
+          const i = parseInt(btn.getAttribute('data-idx'), 10);
+          const arr = friendsArr();
+          if (!isNaN(i) && arr[i]) {
+            const nm = arr[i].name || 'Teman';
+            arr.splice(i, 1);
+            P.save();
+            clearFriendCache();
+            UI.toast('❌ ' + nm + ' dihapus');
+            UI.closeModal();
+            openFriendsModal();
+          }
+        }
+      });
+    }
+
+    /* ---------- tangkap tombol teman (capture, seperti patch sekolah) ---------- */
+    document.addEventListener('click', function (e) {
+      const t = e.target.closest('[data-act]');
+      if (!t) return;
+      const act = t.getAttribute('data-act');
+
+      if (act === 'manage-friends') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        ensureFriendCode();
+        submitMyScore().catch(function () {});
+        openFriendsModal();
+        return;
+      }
+
+      if (act === 'copy-friendcode') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        const c = ensureFriendCode();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(c)
+            .then(function () { UI.toast('📋 Kode ' + c + ' disalin!'); })
+            .catch(function () { UI.toast('Kode teman: ' + c); });
+        } else UI.toast('Kode teman: ' + c);
+      }
+    }, true);
+
+    ensureFriendCode();
+    console.log('[ML] Patch 4.3C papan teman aktif • kode:', P.data.friendCode);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitReady);
+  } else {
+    waitReady();
+  }
+})();
+</script>
 </body>
 </html>
