@@ -640,22 +640,27 @@
           self._answerSide('e', Number(ans.choice), Number(ans.timeUsed), ans.qid);
         }
 
-        // Guest selects difficulty for its NEXT question. Host consumes a preloaded question.
+        // V24.3: kedua pemain memiliki request soal sendiri.
+        // Player A -> lane p, Player B -> lane e.
         const req=d.questionReq;
-        if (req && req.by==='guest' && req.qid && req.qid!==self._lastGuestReq) {
-          self._lastGuestReq=req.qid;
-          const diff=U.clamp(Number(req.difficulty)||2,1,3);
-          self._issueQuestion('e', diff);
-          self._write({questionReq:null});
+        if(req && req.qid){
+          if(req.by==='playerA' && req.qid!==self._lastPlayerAReq){
+            self._lastPlayerAReq=req.qid;
+            self._issueQuestion('p',U.clamp(Number(req.difficulty)||2,1,3));
+            self._write({questionReq:null});
+          }else if(req.by==='guest' && req.qid!==self._lastGuestReq){
+            self._lastGuestReq=req.qid;
+            self._issueQuestion('e',U.clamp(Number(req.difficulty)||2,1,3));
+            self._write({questionReq:null});
+          }
         }
 
         // Hero skill remains separate from question skill.
-        if (d.heroSkillReq && d.heroSkillReq.by==='guest' && d.heroSkillReq.id) {
-          if (d.heroSkillReq.qid !== self._lastHeroSkillReq) {
-            self._lastHeroSkillReq=d.heroSkillReq.qid;
-            battle.useSkillSide('e', d.heroSkillReq.id);
-            self._write({heroSkillReq:null});
-          }
+        if(d.heroSkillReq && d.heroSkillReq.id && d.heroSkillReq.qid!==self._lastHeroSkillReq){
+          self._lastHeroSkillReq=d.heroSkillReq.qid;
+          const skillSide=d.heroSkillReq.by==='playerA'?'p':'e';
+          battle.useSkillSide(skillSide,d.heroSkillReq.id);
+          self._write({heroSkillReq:null});
         }
       }, function(e){ if(G.console) console.error('[ML PVP HOST LISTENER]', e && (e.code||e.message)||e); });
 
@@ -1002,7 +1007,8 @@
       if(this._difficultyReqSent)return false;
       this._difficultyReqSent=true;
       const qid='req-'+getUid(this.fb)+'-'+Date.now();
-      this._write({questionReq:{by:'guest',difficulty:d,qid:qid}}).catch((err)=>{
+      const requester=this.role==='playerA'?'playerA':'guest';
+      this._write({questionReq:{by:requester,difficulty:d,qid:qid}}).catch((err)=>{
         this._difficultyReqSent=false;
         if(G.console) console.error('[ML PVP GUEST SKILL WRITE]', err && (err.code||err.message)||err);
         this.emit('neterror',{stage:'skill',error:String(err && (err.code||err.message)||err)});
@@ -1015,7 +1021,7 @@
       if(this.role==='watch'||this.finished)return false;
       if(this.role==='host')return this.battle.useSkill(id);
       const qid='skill-'+getUid(this.fb)+'-'+Date.now();
-      this._write({heroSkillReq:{by:'guest',id:id,qid:qid}}); return true;
+      this._write({heroSkillReq:{by:this.role==='playerA'?'playerA':'guest',id:id,qid:qid}}); return true;
     }
     surrender(){
       if(this.role==='watch'||this.finished)return;

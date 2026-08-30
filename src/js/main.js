@@ -70,9 +70,29 @@
       // Wasit bukan pemain: jangan tampilkan Victory/Defeat milik Player A.
       if(info.role==='referee'){
         AU.musicStop();
+        const a=(info.players&&info.players.a)||{};
+        const b=(info.players&&info.players.b)||{};
+        const winner=res.win ? (a.name||'Player A') : (res.draw ? 'SERI' : (b.name||'Player B'));
         setTimeout(function(){
-          UI.toast('🏁 Pertandingan selesai — Wasit menampilkan hasil pertandingan');
+          UI.detachBattle();
+          net.destroy();
+          if(App.battle===net) App.battle=null;
           UI.show('home');
+          UI.modal(
+            '<h3>🏁 HASIL PERTANDINGAN</h3>'+
+            '<p style="text-align:center;font-size:18px;margin:8px 0 14px"><b>'+
+            U.esc(a.name||'PLAYER A')+' vs '+U.esc(b.name||'PLAYER B')+'</b></p>'+
+            '<div class="result-score" style="text-align:center;padding:12px 8px;margin-bottom:12px">'+
+            '<div style="font-size:13px;opacity:.75">PEMENANG</div>'+
+            '<div style="font-size:24px;font-weight:900;margin-top:5px">'+(res.draw?'🤝 SERI':'🏆 '+U.esc(winner))+'</div>'+
+            '</div>'+
+            '<p style="text-align:center;margin:6px 0">❤️ '+U.esc(a.name||'Player A')+': <b>'+Math.max(0,Math.round(net.p&&net.p.hp||0))+'</b> HP</p>'+
+            '<p style="text-align:center;margin:6px 0 16px">❤️ '+U.esc(b.name||'Player B')+': <b>'+Math.max(0,Math.round(net.e&&net.e.hp||0))+'</b> HP</p>'+
+            '<div class="m-actions"><button class="btn primary" data-ref-result="close">SELESAI</button></div>'
+          );
+          const modalRoot=document.getElementById('modal-root');
+          const btn=modalRoot&&modalRoot.querySelector('[data-ref-result="close"]');
+          if(btn)btn.addEventListener('click',function(){UI.closeModal();});
         },1100);
       }else{
         onEngineEnd(net, res, null);

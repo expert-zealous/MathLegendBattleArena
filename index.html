@@ -4069,22 +4069,27 @@ window.ML_FIREBASE_CONFIG = {
           self._answerSide('e', Number(ans.choice), Number(ans.timeUsed), ans.qid);
         }
 
-        // Guest selects difficulty for its NEXT question. Host consumes a preloaded question.
+        // V24.3: kedua pemain memiliki request soal sendiri.
+        // Player A -> lane p, Player B -> lane e.
         const req=d.questionReq;
-        if (req && req.by==='guest' && req.qid && req.qid!==self._lastGuestReq) {
-          self._lastGuestReq=req.qid;
-          const diff=U.clamp(Number(req.difficulty)||2,1,3);
-          self._issueQuestion('e', diff);
-          self._write({questionReq:null});
+        if(req && req.qid){
+          if(req.by==='playerA' && req.qid!==self._lastPlayerAReq){
+            self._lastPlayerAReq=req.qid;
+            self._issueQuestion('p',U.clamp(Number(req.difficulty)||2,1,3));
+            self._write({questionReq:null});
+          }else if(req.by==='guest' && req.qid!==self._lastGuestReq){
+            self._lastGuestReq=req.qid;
+            self._issueQuestion('e',U.clamp(Number(req.difficulty)||2,1,3));
+            self._write({questionReq:null});
+          }
         }
 
         // Hero skill remains separate from question skill.
-        if (d.heroSkillReq && d.heroSkillReq.by==='guest' && d.heroSkillReq.id) {
-          if (d.heroSkillReq.qid !== self._lastHeroSkillReq) {
-            self._lastHeroSkillReq=d.heroSkillReq.qid;
-            battle.useSkillSide('e', d.heroSkillReq.id);
-            self._write({heroSkillReq:null});
-          }
+        if(d.heroSkillReq && d.heroSkillReq.id && d.heroSkillReq.qid!==self._lastHeroSkillReq){
+          self._lastHeroSkillReq=d.heroSkillReq.qid;
+          const skillSide=d.heroSkillReq.by==='playerA'?'p':'e';
+          battle.useSkillSide(skillSide,d.heroSkillReq.id);
+          self._write({heroSkillReq:null});
         }
       }, function(e){ if(G.console) console.error('[ML PVP HOST LISTENER]', e && (e.code||e.message)||e); });
 
@@ -4431,7 +4436,8 @@ window.ML_FIREBASE_CONFIG = {
       if(this._difficultyReqSent)return false;
       this._difficultyReqSent=true;
       const qid='req-'+getUid(this.fb)+'-'+Date.now();
-      this._write({questionReq:{by:'guest',difficulty:d,qid:qid}}).catch((err)=>{
+      const requester=this.role==='playerA'?'playerA':'guest';
+      this._write({questionReq:{by:requester,difficulty:d,qid:qid}}).catch((err)=>{
         this._difficultyReqSent=false;
         if(G.console) console.error('[ML PVP GUEST SKILL WRITE]', err && (err.code||err.message)||err);
         this.emit('neterror',{stage:'skill',error:String(err && (err.code||err.message)||err)});
@@ -4444,7 +4450,7 @@ window.ML_FIREBASE_CONFIG = {
       if(this.role==='watch'||this.finished)return false;
       if(this.role==='host')return this.battle.useSkill(id);
       const qid='skill-'+getUid(this.fb)+'-'+Date.now();
-      this._write({heroSkillReq:{by:'guest',id:id,qid:qid}}); return true;
+      this._write({heroSkillReq:{by:this.role==='playerA'?'playerA':'guest',id:id,qid:qid}}); return true;
     }
     surrender(){
       if(this.role==='watch'||this.finished)return;
@@ -5578,9 +5584,29 @@ window.ML_FIREBASE_CONFIG = {
       // Wasit bukan pemain: jangan tampilkan Victory/Defeat milik Player A.
       if(info.role==='referee'){
         AU.musicStop();
+        const a=(info.players&&info.players.a)||{};
+        const b=(info.players&&info.players.b)||{};
+        const winner=res.win ? (a.name||'Player A') : (res.draw ? 'SERI' : (b.name||'Player B'));
         setTimeout(function(){
-          UI.toast('🏁 Pertandingan selesai — Wasit menampilkan hasil pertandingan');
+          UI.detachBattle();
+          net.destroy();
+          if(App.battle===net) App.battle=null;
           UI.show('home');
+          UI.modal(
+            '<h3>🏁 HASIL PERTANDINGAN</h3>'+
+            '<p style="text-align:center;font-size:18px;margin:8px 0 14px"><b>'+
+            U.esc(a.name||'PLAYER A')+' vs '+U.esc(b.name||'PLAYER B')+'</b></p>'+
+            '<div class="result-score" style="text-align:center;padding:12px 8px;margin-bottom:12px">'+
+            '<div style="font-size:13px;opacity:.75">PEMENANG</div>'+
+            '<div style="font-size:24px;font-weight:900;margin-top:5px">'+(res.draw?'🤝 SERI':'🏆 '+U.esc(winner))+'</div>'+
+            '</div>'+
+            '<p style="text-align:center;margin:6px 0">❤️ '+U.esc(a.name||'Player A')+': <b>'+Math.max(0,Math.round(net.p&&net.p.hp||0))+'</b> HP</p>'+
+            '<p style="text-align:center;margin:6px 0 16px">❤️ '+U.esc(b.name||'Player B')+': <b>'+Math.max(0,Math.round(net.e&&net.e.hp||0))+'</b> HP</p>'+
+            '<div class="m-actions"><button class="btn primary" data-ref-result="close">SELESAI</button></div>'
+          );
+          const modalRoot=document.getElementById('modal-root');
+          const btn=modalRoot&&modalRoot.querySelector('[data-ref-result="close"]');
+          if(btn)btn.addEventListener('click',function(){UI.closeModal();});
         },1100);
       }else{
         onEngineEnd(net, res, null);
