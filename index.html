@@ -1018,6 +1018,29 @@ button{font-family:inherit}
 .account-actions,.profile-actions,.cloud-actions{display:flex;flex-direction:column;gap:14px}.account-actions .btn,.profile-actions .btn,.cloud-actions .btn{margin:0!important}
 @media (max-width:600px){.btn.big{min-height:58px;font-size:17px!important}.tile{border-radius:17px!important}.tile b{width:36px;height:36px;border-radius:12px}.diff-skill,.skill-btn{min-height:52px}}
 
+
+/* ================= V19.2 PURPLE PREMIUM UI ================= */
+:root{--ui-purple:#7c3aed;--ui-purple2:#a855f7;--ui-purple3:#4c1d95;--ui-glow:rgba(168,85,247,.38)}
+.btn{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(216,180,254,.55)!important;box-shadow:0 -3px 12px rgba(196,181,253,.22),0 8px 20px rgba(15,23,42,.14)!important}
+.btn::before{content:"";position:absolute;left:10%;right:10%;top:2px;height:42%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0));pointer-events:none;z-index:-1}
+.btn.primary,.btn.big.primary{background:linear-gradient(135deg,#c084fc 0%,#8b5cf6 48%,#5b21b6 100%)!important;color:#fff!important;text-shadow:0 2px 3px rgba(49,8,104,.45)!important;box-shadow:0 -4px 16px rgba(216,180,254,.36),0 7px 16px rgba(30,10,60,.18),inset 0 1px 0 rgba(255,255,255,.48)!important}
+.btn.online{background:linear-gradient(135deg,#a855f7,#6d28d9 55%,#4c1d95)!important;box-shadow:0 -4px 16px rgba(192,132,252,.4),0 7px 17px rgba(30,10,60,.2),inset 0 1px 0 rgba(255,255,255,.48)!important}
+.btn.ghost{background:linear-gradient(180deg,#f8f5ff,#ede9fe)!important;color:#5b21b6!important;border-color:#c4b5fd!important;box-shadow:0 -3px 10px rgba(196,181,253,.2),0 5px 12px rgba(49,46,129,.1)!important}
+.btn.danger{box-shadow:0 -3px 12px rgba(254,202,202,.28),0 6px 14px rgba(127,29,29,.16)!important}
+.btn:hover{transform:translateY(-1px) scale(1.01)!important;filter:brightness(1.1)}
+.btn:active{transform:translateY(2px) scale(.985)!important;box-shadow:0 -2px 8px rgba(216,180,254,.2),0 3px 9px rgba(15,23,42,.14)!important}
+/* Victory presentation */
+.res-banner{overflow:visible;min-height:112px;display:flex;align-items:center;justify-content:center;text-shadow:0 4px 12px rgba(30,10,60,.55)}
+.res-banner.win{background:radial-gradient(circle at 50% 12%,#f5d0fe 0,#c084fc 28%,#7e22ce 62%,#3b0764 100%);border:1px solid rgba(255,255,255,.5);box-shadow:0 -10px 30px rgba(233,213,255,.35),0 14px 32px rgba(76,29,149,.32),inset 0 1px 0 rgba(255,255,255,.55);animation:victoryEnter .75s cubic-bezier(.16,.8,.25,1)}
+.res-banner.win::before{content:"✦";position:absolute;left:9%;top:10%;font-size:34px;color:#fff;filter:drop-shadow(0 0 9px #fff);animation:victorySpark 1.8s ease-in-out infinite}
+.res-banner.win::after{content:"✦";position:absolute;right:10%;bottom:9%;font-size:25px;color:#f5d0fe;filter:drop-shadow(0 0 8px #fff);animation:victorySpark 1.8s .6s ease-in-out infinite}
+@keyframes victoryEnter{0%{opacity:0;transform:scale(.45) translateY(18px);filter:brightness(2)}60%{opacity:1;transform:scale(1.08) translateY(-3px)}100%{transform:scale(1) translateY(0)}}
+@keyframes victorySpark{0%,100%{transform:scale(.7) rotate(0);opacity:.55}50%{transform:scale(1.28) rotate(20deg);opacity:1}}
+.victory-crown{position:absolute;top:-28px;left:50%;transform:translateX(-50%);font-size:40px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.25));animation:crownFloat 2s ease-in-out infinite}
+@keyframes crownFloat{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-5px)}}
+.victory-ray{position:absolute;inset:-18px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0 7%,rgba(255,255,255,.15) 7% 10%,transparent 10% 22%,rgba(255,255,255,.1) 22% 25%,transparent 25% 100%);animation:raySpin 10s linear infinite;z-index:-1}
+@keyframes raySpin{to{transform:rotate(360deg)}}
+.confetti{width:7px;height:13px;box-shadow:0 0 7px currentColor}
 </style>
 </head>
 <body>
@@ -4804,7 +4827,11 @@ window.ML_FIREBASE_CONFIG = {
       this.wrongOpen = false;
       const banner = el('res-banner');
       banner.className = 'res-banner ' + (res.win ? 'win' : res.draw ? 'draw' : 'lose');
-      banner.textContent = res.win ? '🏆 VICTORY' : res.draw ? '🤝 DRAW' : 'DEFEAT';
+      banner.textContent = res.win ? 'VICTORY!' : res.draw ? '🤝 DRAW' : 'DEFEAT';
+      if (res.win) {
+        const ray = document.createElement('span'); ray.className = 'victory-ray'; banner.appendChild(ray);
+        const crown = document.createElement('span'); crown.className = 'victory-crown'; crown.textContent = '👑'; banner.appendChild(crown);
+      }
       // confetti ringan saat menang (elemen sedikit, dihapus otomatis)
       if (res.win) {
         const colors = ['#f59e0b', '#ef4444', '#10b981', '#6366f1', '#ec4899'];
