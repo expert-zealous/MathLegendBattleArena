@@ -3927,16 +3927,14 @@ window.ML_FIREBASE_CONFIG = {
         self._slots.e[d].push(self._makeNetQuestion(d));
       });
 
-      // Relay seluruh event Battle ke NetBattle. Ini penting karena UI terpasang
-      // pada NetBattle, bukan langsung pada Battle. Tanpa relay host dapat menjawab
-      // tetapi animasi/serangan dan frame sinkronisasi tidak pernah diteruskan.
-      ['question','timer','answered','attack','skill','difficulty'].forEach(function(evt){
-        battle.on(evt, function(data){
-          self.emit(evt, data);
-          if (evt==='answered' || evt==='attack' || evt==='skill') {
-            self._pendingEvts.push({n:evt,d:data});
-            self._scheduleFlush();
-          }
+      // Teruskan seluruh event Battle ke UI Host DAN ke Guest melalui frame Firebase.
+      // Sebelumnya Battle berjalan, tetapi event serangan/jawaban tidak konsisten disalin ke NetBattle.
+      ['question','timer','answered','attack','skill','difficulty'].forEach(function(evName){
+        battle.on(evName, function(data){
+          self.emit(evName, data);
+          if(evName==='timer' || evName==='question') return;
+          self._pendingEvts.push({n:evName,d:JSON.parse(JSON.stringify(data||{}))});
+          self._scheduleFlush();
         });
       });
 
@@ -4162,21 +4160,7 @@ window.ML_FIREBASE_CONFIG = {
       const self = this;
       this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function (snap) {
         if (!snap.exists()) return;
-        const d = snap.data() || {};
-        // Wasit harus memakai hero dan nama yang benar-benar tersimpan di room,
-        // bukan default Raka.
-        const hh = d.hostHero || (d.heroes && d.heroes.host);
-        const gh = d.guestHero || (d.heroes && d.heroes.guest);
-        if (hh && (!self.p.hero || self.p.hero.id !== hh)) {
-          self.p.hero = self._heroDef(hh);
-          self.p.maxHp = self.p.hero.hp; self.p.hp = Math.min(self.p.hp || self.p.maxHp, self.p.maxHp);
-        }
-        if (gh && (!self.e.hero || self.e.hero.id !== gh)) {
-          self.e.hero = self._heroDef(gh);
-          self.e.maxHp = self.e.hero.hp; self.e.hp = Math.min(self.e.hp || self.e.maxHp, self.e.maxHp);
-        }
-        self.cfg.playerName = d.hostName || (d.names && d.names.host) || self.cfg.playerName;
-        self.ai.level.bot = d.guestName || (d.names && d.names.guest) || self.ai.level.bot;
+        const d = snap.data();
         if (d.q && d.q.round > self._lastQRound) {
           self._lastQRound = d.q.round;
           self.q = {
@@ -4235,7 +4219,15 @@ window.ML_FIREBASE_CONFIG = {
       st.answered=true;
       if(this._timerIv){clearInterval(this._timerIv);this._timerIv=null;}
       this.emit('answered',{side:'p',correct:ok,grade:grade,timeUsed:Math.round(used*10)/10,answer:String(st.q.choices[st.q.answerIndex]),explanation:'',combo:this.p.combo,energy:this.p.energy,source:'NET',hpP:this.p.hp,hpE:this.e.hp});
-      this._write({ansE:{by:'guest',qid:st.payload.qid,choice:i,timeUsed:Math.round(used*10)/10}});
+      // Kirim jawaban guest ke host. Jika Firebase gagal, buka kembali soal agar pemain tidak terkunci.
+      const answerPatch={ansE:{by:'guest',qid:st.payload.qid,choice:i,timeUsed:Math.round(used*10)/10}};
+      const self=this;
+      this._write(answerPatch).then(function(ok){
+        if(ok===false){
+          st.answered=false; self._answeredLocal=false; self.p.answered=false;
+          self.emit('neterror',{message:'Jawaban gagal dikirim. Coba lagi.'});
+        }
+      });
     }
     chooseDifficulty(diff){
       if(this.role==='watch'||this.finished)return false;
@@ -4272,7 +4264,15 @@ window.ML_FIREBASE_CONFIG = {
     /* ---------- util ---------- */
     _write(patch) {
       const fs = this.fb.fs;
-      try { fs.setDoc(this.roomRef, patch, { merge: true }).catch(function () {}); } catch (e) {}
+      try {
+        return fs.setDoc(this.roomRef, patch, { merge: true }).then(function(){ return true; }).catch(function(err){
+          if(G.console) console.error('[ML PVP WRITE]',err && (err.code||err.message)||err, patch);
+          return false;
+        });
+      } catch (e) {
+        if(G.console) console.error('[ML PVP WRITE]',e && (e.code||e.message)||e, patch);
+        return Promise.resolve(false);
+      }
     }
     _scheduleFlush() {
       const self = this;
