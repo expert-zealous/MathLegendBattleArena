@@ -975,72 +975,11 @@ body {
   .skill-hint { order:3; width:100%; }
 }
 
-
 /* V18.1 Account UI spacing */
 .account-actions{display:flex;flex-direction:column;gap:12px;margin-top:14px;width:100%}
 .account-actions .wide{margin:0!important}
 .account-state{margin-bottom:14px}
 
-
-/* ================= V19.1 PREMIUM BUTTON & MENU UI ================= */
-:root{--ui-gold:#ffd54a;--ui-ink:#10162b;--ui-glow:rgba(255,213,74,.34)}
-button{font-family:inherit}
-.btn,.tile,.skill-btn,.diff-skill,.ava-btn,.back,.btn-quit{
-  -webkit-tap-highlight-color:transparent; touch-action:manipulation;
-}
-.btn{
-  position:relative; isolation:isolate; overflow:hidden;
-  border:1px solid rgba(255,255,255,.34)!important;
-  border-bottom-width:4px!important;
-  box-shadow:0 8px 0 rgba(15,23,42,.20),0 12px 28px rgba(15,23,42,.22),inset 0 1px 0 rgba(255,255,255,.45)!important;
-  letter-spacing:.35px; font-weight:900!important; transition:transform .14s ease,filter .14s ease,box-shadow .14s ease;
-}
-.btn::after{content:"";position:absolute;z-index:-1;left:-20%;right:-20%;top:-70%;height:95%;background:linear-gradient(180deg,rgba(255,255,255,.38),transparent);transform:rotate(-8deg);pointer-events:none}
-.btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
-.btn:active{transform:translateY(4px) scale(.985)!important;box-shadow:0 3px 0 rgba(15,23,42,.18),0 6px 14px rgba(15,23,42,.18)!important}
-.btn.primary,.btn.big.primary{background:linear-gradient(180deg,#ffda54 0%,#f59e0b 52%,#d97706 100%)!important;color:#2a1600!important;text-shadow:0 1px rgba(255,255,255,.38);box-shadow:0 8px 0 #a85c00,0 0 22px var(--ui-glow),inset 0 1px 0 rgba(255,255,255,.7)!important}
-.btn.online{background:linear-gradient(180deg,#34d399,#059669 58%,#047857)!important;box-shadow:0 8px 0 #065f46,0 0 20px rgba(52,211,153,.24),inset 0 1px 0 rgba(255,255,255,.5)!important}
-.btn.ghost{background:linear-gradient(180deg,#ffffff,#eef2ff)!important;color:#24305e!important;border-color:#b8c4ff!important;box-shadow:0 7px 0 #c7d2fe,0 10px 20px rgba(49,46,129,.12)!important}
-.btn.danger{box-shadow:0 8px 0 #b91c1c,0 10px 24px rgba(239,68,68,.22)!important}
-.tile{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.72)!important;border-bottom:4px solid rgba(30,41,59,.16)!important;border-radius:20px!important;background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(241,245,249,.96))!important;box-shadow:0 8px 18px rgba(15,23,42,.12),inset 0 1px 0 #fff!important;transition:transform .16s ease,box-shadow .16s ease!important}
-.tile::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,213,74,.18),transparent 45%);pointer-events:none}
-.tile:hover{transform:translateY(-4px) scale(1.015);box-shadow:0 13px 24px rgba(15,23,42,.17)!important}
-.tile:active{transform:translateY(2px) scale(.985)}
-.tile b{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(180deg,#fff7d1,#fde68a);box-shadow:0 4px 0 #f2c94c,0 7px 14px rgba(245,158,11,.18);margin-bottom:5px}
-.ava-btn{border:2px solid var(--ui-gold)!important;background:radial-gradient(circle at 35% 30%,#fff8d5,#f59e0b)!important;box-shadow:0 0 0 3px rgba(255,213,74,.17),0 6px 15px rgba(245,158,11,.26)!important;transition:transform .15s ease!important}.ava-btn:active{transform:scale(.92)}
-.back,.btn-quit{border:1px solid rgba(255,255,255,.55)!important;background:linear-gradient(180deg,#334155,#0f172a)!important;box-shadow:0 5px 0 #020617,0 8px 16px rgba(15,23,42,.25)!important}.back:active,.btn-quit:active{transform:translateY(3px)}
-.diff-skill,.skill-btn{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.36)!important;border-bottom:4px solid rgba(15,23,42,.25)!important;box-shadow:0 7px 0 rgba(15,23,42,.22),0 10px 20px rgba(15,23,42,.22),inset 0 1px 0 rgba(255,255,255,.36)!important;transition:transform .13s ease,filter .13s ease!important}
-.diff-skill:hover,.skill-btn:hover{transform:translateY(-2px);filter:brightness(1.08)}.diff-skill:active,.skill-btn:active{transform:translateY(4px) scale(.97)!important;box-shadow:0 3px 0 rgba(15,23,42,.2)!important}
-.diff-skill b,.skill-btn b{letter-spacing:.7px}.diff-skill span{font-size:.78em;opacity:.88;font-weight:800}
-.diff-skill.easy{background:linear-gradient(180deg,#4ade80,#16a34a)!important}.diff-skill.medium{background:linear-gradient(180deg,#facc15,#f59e0b)!important}.diff-skill.hard{background:linear-gradient(180deg,#fb7185,#e11d48)!important}
-.link-btn{font-weight:800!important;letter-spacing:.2px;text-decoration:none!important;border-bottom:1px dashed currentColor}
-/* account/profile action spacing and polish */
-.account-actions,.profile-actions,.cloud-actions{display:flex;flex-direction:column;gap:14px}.account-actions .btn,.profile-actions .btn,.cloud-actions .btn{margin:0!important}
-@media (max-width:600px){.btn.big{min-height:58px;font-size:17px!important}.tile{border-radius:17px!important}.tile b{width:36px;height:36px;border-radius:12px}.diff-skill,.skill-btn{min-height:52px}}
-
-
-/* ================= V19.2 PURPLE PREMIUM UI ================= */
-:root{--ui-purple:#7c3aed;--ui-purple2:#a855f7;--ui-purple3:#4c1d95;--ui-glow:rgba(168,85,247,.38)}
-.btn{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(216,180,254,.55)!important;box-shadow:0 -3px 12px rgba(196,181,253,.22),0 8px 20px rgba(15,23,42,.14)!important}
-.btn::before{content:"";position:absolute;left:10%;right:10%;top:2px;height:42%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0));pointer-events:none;z-index:-1}
-.btn.primary,.btn.big.primary{background:linear-gradient(135deg,#c084fc 0%,#8b5cf6 48%,#5b21b6 100%)!important;color:#fff!important;text-shadow:0 2px 3px rgba(49,8,104,.45)!important;box-shadow:0 -4px 16px rgba(216,180,254,.36),0 7px 16px rgba(30,10,60,.18),inset 0 1px 0 rgba(255,255,255,.48)!important}
-.btn.online{background:linear-gradient(135deg,#a855f7,#6d28d9 55%,#4c1d95)!important;box-shadow:0 -4px 16px rgba(192,132,252,.4),0 7px 17px rgba(30,10,60,.2),inset 0 1px 0 rgba(255,255,255,.48)!important}
-.btn.ghost{background:linear-gradient(180deg,#f8f5ff,#ede9fe)!important;color:#5b21b6!important;border-color:#c4b5fd!important;box-shadow:0 -3px 10px rgba(196,181,253,.2),0 5px 12px rgba(49,46,129,.1)!important}
-.btn.danger{box-shadow:0 -3px 12px rgba(254,202,202,.28),0 6px 14px rgba(127,29,29,.16)!important}
-.btn:hover{transform:translateY(-1px) scale(1.01)!important;filter:brightness(1.1)}
-.btn:active{transform:translateY(2px) scale(.985)!important;box-shadow:0 -2px 8px rgba(216,180,254,.2),0 3px 9px rgba(15,23,42,.14)!important}
-/* Victory presentation */
-.res-banner{overflow:visible;min-height:112px;display:flex;align-items:center;justify-content:center;text-shadow:0 4px 12px rgba(30,10,60,.55)}
-.res-banner.win{background:radial-gradient(circle at 50% 12%,#f5d0fe 0,#c084fc 28%,#7e22ce 62%,#3b0764 100%);border:1px solid rgba(255,255,255,.5);box-shadow:0 -10px 30px rgba(233,213,255,.35),0 14px 32px rgba(76,29,149,.32),inset 0 1px 0 rgba(255,255,255,.55);animation:victoryEnter .75s cubic-bezier(.16,.8,.25,1)}
-.res-banner.win::before{content:"✦";position:absolute;left:9%;top:10%;font-size:34px;color:#fff;filter:drop-shadow(0 0 9px #fff);animation:victorySpark 1.8s ease-in-out infinite}
-.res-banner.win::after{content:"✦";position:absolute;right:10%;bottom:9%;font-size:25px;color:#f5d0fe;filter:drop-shadow(0 0 8px #fff);animation:victorySpark 1.8s .6s ease-in-out infinite}
-@keyframes victoryEnter{0%{opacity:0;transform:scale(.45) translateY(18px);filter:brightness(2)}60%{opacity:1;transform:scale(1.08) translateY(-3px)}100%{transform:scale(1) translateY(0)}}
-@keyframes victorySpark{0%,100%{transform:scale(.7) rotate(0);opacity:.55}50%{transform:scale(1.28) rotate(20deg);opacity:1}}
-.victory-crown{position:absolute;top:-28px;left:50%;transform:translateX(-50%);font-size:40px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.25));animation:crownFloat 2s ease-in-out infinite}
-@keyframes crownFloat{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-5px)}}
-.victory-ray{position:absolute;inset:-18px;border-radius:inherit;background:conic-gradient(from 0deg,transparent 0 7%,rgba(255,255,255,.15) 7% 10%,transparent 10% 22%,rgba(255,255,255,.1) 22% 25%,transparent 25% 100%);animation:raySpin 10s linear infinite;z-index:-1}
-@keyframes raySpin{to{transform:rotate(360deg)}}
-.confetti{width:7px;height:13px;box-shadow:0 0 7px currentColor}
 </style>
 </head>
 <body>
@@ -3341,6 +3280,22 @@ window.ML_FIREBASE_CONFIG = {
 
     isLinked: function () { return !!(this.online && this.user && this.user.linked); },
 
+    friendlyAuthError: function (e) {
+      const code = (e && e.code) || '';
+      const msg = (e && e.message) || '';
+      const map = {
+        'auth/operation-not-allowed':'Login Google belum diaktifkan di Firebase Authentication.',
+        'auth/unauthorized-domain':'Domain aplikasi belum diizinkan di Firebase Authentication.',
+        'auth/popup-blocked':'Popup Google diblokir browser. Izinkan popup lalu coba lagi.',
+        'auth/popup-closed-by-user':'Jendela login Google ditutup sebelum selesai.',
+        'auth/account-exists-with-different-credential':'Akun ini sudah memakai metode login lain.',
+        'auth/credential-already-in-use':'Akun Google ini sudah tertaut pada pemain lain.',
+        'permission-denied':'Firestore menolak akses. Firestore Rules perlu diperiksa.'
+      };
+      return map[code] || (code ? code + ': ' + msg : msg || 'Terjadi kesalahan Firebase');
+    },
+
+
     /* Tautkan akun Google ke pemain saat ini. UID anonim dipertahankan,
        sehingga progres lokal/cloud langsung menjadi milik akun permanen. */
     linkGoogle: async function () {
@@ -3972,6 +3927,19 @@ window.ML_FIREBASE_CONFIG = {
         self._slots.e[d].push(self._makeNetQuestion(d));
       });
 
+      // Relay seluruh event Battle ke NetBattle. Ini penting karena UI terpasang
+      // pada NetBattle, bukan langsung pada Battle. Tanpa relay host dapat menjawab
+      // tetapi animasi/serangan dan frame sinkronisasi tidak pernah diteruskan.
+      ['question','timer','answered','attack','skill','difficulty'].forEach(function(evt){
+        battle.on(evt, function(data){
+          self.emit(evt, data);
+          if (evt==='answered' || evt==='attack' || evt==='skill') {
+            self._pendingEvts.push({n:evt,d:data});
+            self._scheduleFlush();
+          }
+        });
+      });
+
       battle.on('end', function(res){
         self.finished = true;
         self._clearNetTimers();
@@ -4194,7 +4162,21 @@ window.ML_FIREBASE_CONFIG = {
       const self = this;
       this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function (snap) {
         if (!snap.exists()) return;
-        const d = snap.data();
+        const d = snap.data() || {};
+        // Wasit harus memakai hero dan nama yang benar-benar tersimpan di room,
+        // bukan default Raka.
+        const hh = d.hostHero || (d.heroes && d.heroes.host);
+        const gh = d.guestHero || (d.heroes && d.heroes.guest);
+        if (hh && (!self.p.hero || self.p.hero.id !== hh)) {
+          self.p.hero = self._heroDef(hh);
+          self.p.maxHp = self.p.hero.hp; self.p.hp = Math.min(self.p.hp || self.p.maxHp, self.p.maxHp);
+        }
+        if (gh && (!self.e.hero || self.e.hero.id !== gh)) {
+          self.e.hero = self._heroDef(gh);
+          self.e.maxHp = self.e.hero.hp; self.e.hp = Math.min(self.e.hp || self.e.maxHp, self.e.maxHp);
+        }
+        self.cfg.playerName = d.hostName || (d.names && d.names.host) || self.cfg.playerName;
+        self.ai.level.bot = d.guestName || (d.names && d.names.guest) || self.ai.level.bot;
         if (d.q && d.q.round > self._lastQRound) {
           self._lastQRound = d.q.round;
           self.q = {
@@ -4827,11 +4809,7 @@ window.ML_FIREBASE_CONFIG = {
       this.wrongOpen = false;
       const banner = el('res-banner');
       banner.className = 'res-banner ' + (res.win ? 'win' : res.draw ? 'draw' : 'lose');
-      banner.textContent = res.win ? 'VICTORY!' : res.draw ? '🤝 DRAW' : 'DEFEAT';
-      if (res.win) {
-        const ray = document.createElement('span'); ray.className = 'victory-ray'; banner.appendChild(ray);
-        const crown = document.createElement('span'); crown.className = 'victory-crown'; crown.textContent = '👑'; banner.appendChild(crown);
-      }
+      banner.textContent = res.win ? '🏆 VICTORY' : res.draw ? '🤝 DRAW' : 'DEFEAT';
       // confetti ringan saat menang (elemen sedikit, dihapus otomatis)
       if (res.win) {
         const colors = ['#f59e0b', '#ef4444', '#10b981', '#6366f1', '#ec4899'];

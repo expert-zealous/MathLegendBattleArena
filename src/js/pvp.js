@@ -498,6 +498,19 @@
         self._slots.e[d].push(self._makeNetQuestion(d));
       });
 
+      // Relay seluruh event Battle ke NetBattle. Ini penting karena UI terpasang
+      // pada NetBattle, bukan langsung pada Battle. Tanpa relay host dapat menjawab
+      // tetapi animasi/serangan dan frame sinkronisasi tidak pernah diteruskan.
+      ['question','timer','answered','attack','skill','difficulty'].forEach(function(evt){
+        battle.on(evt, function(data){
+          self.emit(evt, data);
+          if (evt==='answered' || evt==='attack' || evt==='skill') {
+            self._pendingEvts.push({n:evt,d:data});
+            self._scheduleFlush();
+          }
+        });
+      });
+
       battle.on('end', function(res){
         self.finished = true;
         self._clearNetTimers();
@@ -720,7 +733,21 @@
       const self = this;
       this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function (snap) {
         if (!snap.exists()) return;
-        const d = snap.data();
+        const d = snap.data() || {};
+        // Wasit harus memakai hero dan nama yang benar-benar tersimpan di room,
+        // bukan default Raka.
+        const hh = d.hostHero || (d.heroes && d.heroes.host);
+        const gh = d.guestHero || (d.heroes && d.heroes.guest);
+        if (hh && (!self.p.hero || self.p.hero.id !== hh)) {
+          self.p.hero = self._heroDef(hh);
+          self.p.maxHp = self.p.hero.hp; self.p.hp = Math.min(self.p.hp || self.p.maxHp, self.p.maxHp);
+        }
+        if (gh && (!self.e.hero || self.e.hero.id !== gh)) {
+          self.e.hero = self._heroDef(gh);
+          self.e.maxHp = self.e.hero.hp; self.e.hp = Math.min(self.e.hp || self.e.maxHp, self.e.maxHp);
+        }
+        self.cfg.playerName = d.hostName || (d.names && d.names.host) || self.cfg.playerName;
+        self.ai.level.bot = d.guestName || (d.names && d.names.guest) || self.ai.level.bot;
         if (d.q && d.q.round > self._lastQRound) {
           self._lastQRound = d.q.round;
           self.q = {
