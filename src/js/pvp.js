@@ -504,13 +504,24 @@
         battle.on(name, function(data){
           const safe = JSON.parse(JSON.stringify(data || {}));
 
-          // PENTING: Host juga harus menerima event Battle secara lokal.
-          // Sebelumnya event hanya dikirim ke frame Firebase untuk Guest,
-          // sehingga audio dari engine terdengar tetapi UI Host (HP/pose/hasil)
-          // tidak pernah menerima event tersebut.
+          // Host harus menerima event Battle secara lokal DAN state terbaru.
+          // State dipancarkan terpisah agar HUD Host tidak hanya bergantung
+          // pada frame Firebase yang memang ditujukan untuk perangkat lain.
           self.emit(name, safe);
+          self.emit('state', {
+            hpP: battle.p.hp, hpE: battle.e.hp,
+            enP: battle.p.energy, enE: battle.e.energy,
+            cbP: battle.p.combo, cbE: battle.e.combo,
+            shP: battle.p.shield, shE: battle.e.shield
+          });
 
-          // Setelah UI Host menerima event, event yang sama dikirim ke Guest.
+          // Replay event sekali pada tick berikutnya. Ini memastikan UI yang
+          // dipasang sesudah inisialisasi NetBattle tetap menerima event lokal.
+          setTimeout(function () {
+            if (!self.finished) self.emit(name, safe);
+          }, 0);
+
+          // Event yang sama tetap dikirim ke Firebase untuk Guest.
           self._pendingEvts.push({ n:name, d:safe });
           self._scheduleFlush();
         });

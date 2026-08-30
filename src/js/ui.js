@@ -671,6 +671,7 @@
       on('answered', function (d) { self._onAnswered(d); });
       on('attack', function (d) { self._onAttack(d); });
       on('skill', function (d) { self._onSkill(d); });
+      on('state', function (d) { self._onNetState(d); });
       on('difficulty', function (d) { self.showDifficultyChoice(d.difficulty); });
     },
 
@@ -680,6 +681,19 @@
       B.offs = [];
       B.engine = null;
       B.lastPick = null;
+    },
+
+    _onNetState: function (d) {
+      const engine = this.B.engine;
+      if (!engine || !d) return;
+      if (Number.isFinite(Number(d.hpP)) && Number.isFinite(Number(d.hpE))) {
+        this._updHp(Number(d.hpP), engine.p.maxHp, Number(d.hpE), engine.e.maxHp);
+      }
+      if (d.enP != null && d.enE != null) this._updEnergy(Number(d.enP), Number(d.enE));
+      if (d.cbP != null) this._updCombo('p', Number(d.cbP));
+      if (d.cbE != null) this._updCombo('e', Number(d.cbE));
+      if (d.shP != null && d.shE != null) this._updShield(Number(d.shP), Number(d.shE));
+      this._updSkillBtn();
     },
 
     _updHp: function (hpP, maxP, hpE, maxE) {
