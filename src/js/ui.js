@@ -871,7 +871,9 @@
     _onAttack: function (d) {
       const engine = this.B.engine;
       if (!engine) return;
-      this._updHp(d.hpP, engine.p.maxHp, d.hpE, engine.e.maxHp);
+      const hpP = Number.isFinite(Number(d.hpP)) ? Number(d.hpP) : Number(engine.p.hp);
+      const hpE = Number.isFinite(Number(d.hpE)) ? Number(d.hpE) : Number(engine.e.hp);
+      this._updHp(hpP, engine.p.maxHp, hpE, engine.e.maxHp);
       this._updShield(engine.p.shield, engine.e.shield);
 
       // animasi hero

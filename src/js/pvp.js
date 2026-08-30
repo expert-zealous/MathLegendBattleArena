@@ -492,6 +492,8 @@
       this._lastHostAction = 0;
 
       const self = this;
+      this._hostBridgeCount = 0;
+      this._hostAttackBridgeCount = 0;
       // Pre-generate three independent question lanes for each player.
       [1,2,3].forEach(function(d){
         self._slots.p[d].push(self._makeNetQuestion(d));
@@ -507,6 +509,8 @@
           // Host harus menerima event Battle secara lokal DAN state terbaru.
           // State dipancarkan terpisah agar HUD Host tidak hanya bergantung
           // pada frame Firebase yang memang ditujukan untuk perangkat lain.
+          self._hostBridgeCount++;
+          if (name === 'attack') self._hostAttackBridgeCount++;
           self.emit(name, safe);
           self.emit('state', {
             hpP: battle.p.hp, hpE: battle.e.hp,
@@ -653,18 +657,44 @@
       if(side==='e' && this._timerE){clearInterval(this._timerE);this._timerE=null;}
       const b=this.battle;
       b.q=st.q; b.qLimit=st.payload.limit; b.qStart=st.startedAt;
-      // Simpan state sebelum jawaban lalu proses engine host.
-      b.netAnswer(side,index,Math.max(0,Math.min(Number(timeUsed)||st.payload.limit,st.payload.limit)));
 
-      // ROOT FIX HOST: jangan hanya mengandalkan relay event. Setelah netAnswer
-      // selesai secara sinkron, paksa NetBattle memancarkan state aktual engine.
-      // Ini menjamin HUD Host langsung mengikuti battle.p/battle.e.
-      this.emit('state', {
+      // Simpan state sebelum engine berjalan. Ini dipakai sebagai fallback
+      // bila bridge event Battle -> NetBattle gagal pada sisi Host.
+      const before = {
         hpP:b.p.hp, hpE:b.e.hp,
         enP:b.p.energy, enE:b.e.energy,
         cbP:b.p.combo, cbE:b.e.combo,
         shP:b.p.shield, shE:b.e.shield
-      });
+      };
+      const attackBridgeBefore=this._hostAttackBridgeCount||0;
+
+      b.netAnswer(side,index,Math.max(0,Math.min(Number(timeUsed)||st.payload.limit,st.payload.limit)));
+
+      // HUD Host selalu menerima state final, tanpa menunggu Firebase.
+      const after = {
+        hpP:b.p.hp, hpE:b.e.hp,
+        enP:b.p.energy, enE:b.e.energy,
+        cbP:b.p.combo, cbE:b.e.combo,
+        shP:b.p.shield, shE:b.e.shield
+      };
+      this.emit('state', after);
+
+      // Fallback penting: jika engine benar-benar mengubah HP tetapi event attack
+      // tidak sampai ke NetBattle/UI Host, bangun event attack lokal dari state.
+      // Tidak dikirim ke Firebase sehingga Guest tidak menerima duplikasi.
+      if (this.role==='host' && (this._hostAttackBridgeCount||0)===attackBridgeBefore &&
+          (before.hpP!==after.hpP || before.hpE!==after.hpE)) {
+        const from=side==='p'?'p':'e';
+        const to=side==='p'?'e':'p';
+        const dmg=Math.max(0, (to==='p'?before.hpP:before.hpE) - (to==='p'?after.hpP:after.hpE));
+        this.emit('attack',{
+          from:from,to:to,dmg:dmg,crit:false,meteor:false,comeback:false,
+          heal:0,drain:false,grade:'HIT',
+          combo:from==='p'?after.cbP:after.cbE,tags:[],
+          hpP:after.hpP,hpE:after.hpE,shield:to==='p'?after.shP:after.shE,
+          fallback:true
+        });
+      }
       return true;
     }
 
@@ -768,8 +798,8 @@
         const hostName = d.hostName || (d.names && d.names.host) || 'HOST';
         const guestName = d.guestName || (d.names && d.names.guest) || 'GUEST';
         let metaChanged = false;
-        if (hostId) { const h=self._heroDef(hostId); if (!self.p.hero || self.p.hero.id!==h.id) { self.p.hero=h; self.p.maxHp=h.hp; self.p.hp=Math.min(self.p.hp||h.hp,h.hp); metaChanged=true; } }
-        if (guestId) { const g=self._heroDef(guestId); if (!self.e.hero || self.e.hero.id!==g.id) { self.e.hero=g; self.e.maxHp=g.hp; self.e.hp=Math.min(self.e.hp||g.hp,g.hp); metaChanged=true; } }
+        if (hostId) { const h=self._heroDef(hostId); if (!self.p.hero || self.p.hero.id!==h.id) { self.p.hero=h; self.p.maxHp=h.hp; if (!d.frame) self.p.hp=h.hp; metaChanged=true; } }
+        if (guestId) { const g=self._heroDef(guestId); if (!self.e.hero || self.e.hero.id!==g.id) { self.e.hero=g; self.e.maxHp=g.hp; if (!d.frame) self.e.hp=g.hp; metaChanged=true; } }
         if (self.cfg.playerName!==hostName || self.ai.level.bot!==guestName || metaChanged) {
           self.cfg.playerName=hostName; self.ai.level.bot=guestName;
           self.emit('watchmeta',{hostHero:self.p.hero,guestHero:self.e.hero,hostName:hostName,guestName:guestName});
