@@ -672,6 +672,7 @@
       on('attack', function (d) { self._onAttack(d); });
       on('skill', function (d) { self._onSkill(d); });
       on('state', function (d) { self._onNetState(d); });
+      on('watchmeta', function (d) { self._onWatchMeta(d); });
       on('difficulty', function (d) { self.showDifficultyChoice(d.difficulty); });
     },
 
@@ -681,6 +682,22 @@
       B.offs = [];
       B.engine = null;
       B.lastPick = null;
+    },
+
+    _onWatchMeta: function (d) {
+      const engine=this.B.engine;
+      if (!engine || !d) return;
+      if (d.hostHero) {
+        el('b-p-ava').innerHTML=heroImg(d.hostHero);
+        el('b-hero-p').innerHTML=heroBody(d.hostHero,'p');
+      }
+      if (d.guestHero) {
+        el('b-e-ava').innerHTML=heroImg(d.guestHero);
+        el('b-hero-e').innerHTML=heroBody(d.guestHero,'e');
+      }
+      el('b-p-name').textContent=d.hostName || 'HOST';
+      el('b-e-name').textContent=d.guestName || 'GUEST';
+      this._updHp(engine.p.hp,engine.p.maxHp,engine.e.hp,engine.e.maxHp);
     },
 
     _onNetState: function (d) {

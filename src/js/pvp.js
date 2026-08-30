@@ -653,7 +653,18 @@
       if(side==='e' && this._timerE){clearInterval(this._timerE);this._timerE=null;}
       const b=this.battle;
       b.q=st.q; b.qLimit=st.payload.limit; b.qStart=st.startedAt;
+      // Simpan state sebelum jawaban lalu proses engine host.
       b.netAnswer(side,index,Math.max(0,Math.min(Number(timeUsed)||st.payload.limit,st.payload.limit)));
+
+      // ROOT FIX HOST: jangan hanya mengandalkan relay event. Setelah netAnswer
+      // selesai secara sinkron, paksa NetBattle memancarkan state aktual engine.
+      // Ini menjamin HUD Host langsung mengikuti battle.p/battle.e.
+      this.emit('state', {
+        hpP:b.p.hp, hpE:b.e.hp,
+        enP:b.p.energy, enE:b.e.energy,
+        cbP:b.p.combo, cbE:b.e.combo,
+        shP:b.p.shield, shE:b.e.shield
+      });
       return true;
     }
 
@@ -749,7 +760,28 @@
       const self = this;
       this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function (snap) {
         if (!snap.exists()) return;
-        const d = snap.data();
+        const d = snap.data() || {};
+
+        // WASIT: gunakan hero dan nama yang BENAR dari room, bukan default Raka.
+        const hostId = d.hostHero || (d.heroes && d.heroes.host) || null;
+        const guestId = d.guestHero || (d.heroes && d.heroes.guest) || null;
+        const hostName = d.hostName || (d.names && d.names.host) || 'HOST';
+        const guestName = d.guestName || (d.names && d.names.guest) || 'GUEST';
+        let metaChanged = false;
+        if (hostId) { const h=self._heroDef(hostId); if (!self.p.hero || self.p.hero.id!==h.id) { self.p.hero=h; self.p.maxHp=h.hp; self.p.hp=Math.min(self.p.hp||h.hp,h.hp); metaChanged=true; } }
+        if (guestId) { const g=self._heroDef(guestId); if (!self.e.hero || self.e.hero.id!==g.id) { self.e.hero=g; self.e.maxHp=g.hp; self.e.hp=Math.min(self.e.hp||g.hp,g.hp); metaChanged=true; } }
+        if (self.cfg.playerName!==hostName || self.ai.level.bot!==guestName || metaChanged) {
+          self.cfg.playerName=hostName; self.ai.level.bot=guestName;
+          self.emit('watchmeta',{hostHero:self.p.hero,guestHero:self.e.hero,hostName:hostName,guestName:guestName});
+        }
+
+        if (d.frame && d.frame.seq > self._lastSeq) {
+          self._lastSeq = d.frame.seq;
+          self.p.hp = d.frame.hpP; self.p.energy = d.frame.enP; self.p.combo = d.frame.cbP; self.p.shield = d.frame.shP;
+          self.e.hp = d.frame.hpE; self.e.energy = d.frame.enE; self.e.combo = d.frame.cbE; self.e.shield = d.frame.shE;
+          self.emit('state',{hpP:self.p.hp,hpE:self.e.hp,enP:self.p.energy,enE:self.e.energy,cbP:self.p.combo,cbE:self.e.combo,shP:self.p.shield,shE:self.e.shield});
+          (d.frame.evts || []).forEach(function (ev) { self.emit(ev.n, ev.d); });
+        }
         if (d.q && d.q.round > self._lastQRound) {
           self._lastQRound = d.q.round;
           self.q = {
@@ -767,12 +799,6 @@
             q: self.q, round: d.q.round, maxRounds: self.maxRounds, limit: total,
             pEnergy: self.p.energy, eEnergy: self.e.energy
           });
-        }
-        if (d.frame && d.frame.seq > self._lastSeq) {
-          self._lastSeq = d.frame.seq;
-          self.e.hp = d.frame.hpP; self.e.energy = d.frame.enP; self.e.combo = d.frame.cbP; self.e.shield = d.frame.shP;
-          self.p.hp = d.frame.hpE; self.p.energy = d.frame.enE; self.p.combo = d.frame.cbE; self.p.shield = d.frame.shE;
-          (d.frame.evts || []).forEach(function (ev) { self.emit(ev.n, ev.d); }); // tanpa pembalikan: p=host
         }
         if (d.status === 'done' && d.result && !self.finished) {
           self.finished = true;
