@@ -60,31 +60,12 @@
       myName: P.data.name || 'PEMAIN',
       myGear: P.computeGear(P.data.hero),
       myLevel: ML.Rules.levelFromXP(P.data.xp).level,
-      opp: info.opp
+      opp: info.opp,
+      players: info.players || null
     });
     App.battle = net;
 
-    // V23 ROOT ARCHITECTURE:
-    // Host UI memakai Battle engine ASLI, bukan NetBattle wrapper.
-    // Dengan demikian HP, pose attack, combo, shield, dan event visual Host
-    // identik dengan mode AI. NetBattle hanya menjadi transport Firebase/room.
-    let uiEngine = net;
-    if (info.role === 'host' && net.battle) {
-      const realBattle = net.battle;
-
-      // Tombol UI tetap menggunakan API multiplayer (soal/skill independen).
-      realBattle.playerAnswer = function (i) { return net.playerAnswer(i); };
-      realBattle.chooseDifficulty = function (d) { return net.chooseDifficulty(d); };
-
-      // Soal, timer, dan state berasal dari NetBattle; teruskan ke engine asli
-      // agar UI yang attach ke realBattle tetap menerima seluruh alur permainan.
-      ['question','timer','difficulty','state','watchmeta'].forEach(function(ev){
-        net.on(ev,function(data){ realBattle.emit(ev,data); });
-      });
-
-      uiEngine = realBattle;
-    }
-    UI.attachBattle(uiEngine);
+    UI.attachBattle(net);
     net.on('end', function (res) { onEngineEnd(net, res, null); });
     net.on('aborted', function () {
       UI.detachBattle();
@@ -207,7 +188,7 @@
         try {
           const code = ML.PVP.makeCode();      // kode dibuat SEBELUM modal -> selalu tampil
           UI.roomModal(code, function () { if (handle) handle.cancel(); });
-          handle = ML.PVP.createRoom(Bc._fb, me, code,
+          handle = ML.PVP.createRefereeRoom(Bc._fb, code,
             function (info) { UI.closeModal(); startNetBattle(info); },
             function (err) {
               UI.closeModal();
@@ -234,7 +215,7 @@
         UI.inputModal('🔑 Gabung Ruangan', 'Masukkan kode 5 karakter dari pembuat ruangan.', 'KODE', 'GABUNG ⚔️', function (code) {
           let handle = null;
           UI.searchingModal(function () { if (handle) handle.cancel(); });
-          handle = ML.PVP.joinRoom(Bj._fb, { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) }, code,
+          handle = ML.PVP.joinRefereeRoom(Bj._fb, { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) }, code,
             function (info) { UI.closeModal(); startNetBattle(info); },
             function (err) {
               UI.closeModal();

@@ -3792,6 +3792,65 @@ window.ML_FIREBASE_CONFIG = {
     }};
   };
 
+  /* ================= V24: REFEREE + PLAYER A + PLAYER B ================= */
+  PVP.createRefereeRoom = function(fb, code, onReady, onFail, onState){
+    const fs=fb.fs, db=fb.db, uid=getUid(fb);
+    const c=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!fs||!db||!uid||!c){onFail&&onFail('invalid-room');return {cancel:function(){}};}
+    const ref=fs.doc(db,'rooms',c); let unsub=null, done=false;
+    fs.setDoc(ref,_clean({status:'waiting-players',mode:'referee',refereeUid:uid,playerA:null,playerB:null,createdAt:Date.now(),updatedAt:Date.now()}))
+    .then(function(){
+      onState&&onState('waiting');
+      unsub=fs.onSnapshot(ref,function(snap){
+        if(done||!snap.exists())return;
+        const d=snap.data()||{};
+        if(d.playerA&&d.playerB){
+          done=true; if(unsub)unsub(); onState&&onState('starting');
+          onReady&&onReady({role:'referee',roomId:c,players:{a:d.playerA,b:d.playerB},opp:d.playerB});
+        }
+      },function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
+    }).catch(function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
+    return {code:c,cancel:function(){if(done)return;done=true;if(unsub)unsub();fs.deleteDoc(ref).catch(function(){});onFail&&onFail('cancel');}};
+  };
+
+  PVP.joinRefereeRoom = function(fb, me, code, onFound, onFail, onState){
+    const fs=fb.fs, db=fb.db, uid=getUid(fb);
+    const c=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!fs||!db||!uid||!c){onFail&&onFail('invalid-code');return {cancel:function(){}};}
+    const ref=fs.doc(db,'rooms',c); let unsub=null, done=false, slot=null;
+    const mine=_clean({uid:uid,name:(me.name||'PEMAIN').slice(0,12),hero:me.hero||'raka',mr:isFinite(me.mr)?me.mr:1000,level:me.level||1,gear:me.gear||null});
+    fs.runTransaction(db,async function(tx){
+      const snap=await tx.get(ref);
+      if(!snap.exists())throw new Error('NOT_FOUND');
+      const d=snap.data()||{};
+      if(d.mode!=='referee')throw new Error('WRONG_ROOM');
+      if(d.refereeUid===uid)throw new Error('SELF');
+      if(d.playerA&&d.playerA.uid===uid)return 'A';
+      if(d.playerB&&d.playerB.uid===uid)return 'B';
+      if(!d.playerA){tx.set(ref,_clean({playerA:mine,updatedAt:Date.now()}),{merge:true});return 'A';}
+      if(!d.playerB){tx.set(ref,_clean({playerB:mine,status:'ready',updatedAt:Date.now()}),{merge:true});return 'B';}
+      throw new Error('FULL');
+    }).then(function(which){
+      slot=which; onState&&onState(which==='A'?'waiting-player-b':'starting');
+      unsub=fs.onSnapshot(ref,function(snap){
+        if(done||!snap.exists())return;
+        const d=snap.data()||{};
+        if((d.status==='playing'||d.status==='done')&&d.playerA&&d.playerB){
+          done=true;if(unsub)unsub();
+          const opp=slot==='A'?d.playerB:d.playerA;
+          onFound&&onFound({role:slot==='A'?'playerA':'playerB',roomId:c,opp:opp,players:{a:d.playerA,b:d.playerB}});
+        }
+      },function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
+    }).catch(function(e){
+      const m=String(e&&(e.code||e.message)||e);
+      if(/NOT_FOUND/i.test(m))onFail&&onFail('notfound');
+      else if(/FULL/i.test(m))onFail&&onFail('full');
+      else if(/SELF/i.test(m))onFail&&onFail('self');
+      else onFail&&onFail(m);
+    });
+    return {cancel:function(){if(done)return;done=true;if(unsub)unsub();onFail&&onFail('cancel');}};
+  };
+
   PVP.joinRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = getUid(fb);
       if (!fs || !db || !uid) { onFail && onFail('firebase-user-unavailable'); return { cancel: function () {} }; }
@@ -3887,9 +3946,9 @@ window.ML_FIREBASE_CONFIG = {
       this._processedAnsRound = -1;
       this._skillReqSent = false;
       this._difficultyReqSent = false;
-      this._mySide = cfg.role === 'host' ? 'p' : 'e'; // sisi engine (host selalu 'p')
+      this._mySide = (cfg.role === 'host' || cfg.role === 'referee' || cfg.role === 'playerA') ? 'p' : 'e';
 
-      if (cfg.role === 'host') this._initHost();
+      if (cfg.role === 'host' || cfg.role === 'referee') this._initHost();
       else if (cfg.role === 'watch') this._initWatch();
       else this._initGuest();
     }
@@ -3898,15 +3957,22 @@ window.ML_FIREBASE_CONFIG = {
       return ML.DATA.heroes.find(function (h) { return h.id === id; }) || ML.DATA.heroes[0];
     }
 
+
+
     /* ---------- HOST: PvP bebas giliran (soal independen per pemain) ---------- */
     _initHost() {
       const cfg = this.cfgPvp;
       const battle = new ML.Battle({
-        heroId: cfg.myHeroId, aiHeroId: cfg.opp.hero, aiLevelIdx: 2,
+        heroId: (cfg.role==='referee'&&cfg.players?cfg.players.a.hero:cfg.myHeroId),
+        aiHeroId: (cfg.role==='referee'&&cfg.players?cfg.players.b.hero:cfg.opp.hero), aiLevelIdx: 2,
         netMode: true, practice: false,
-        playerGear: cfg.myGear || null, enemyGear: cfg.opp.gear || null,
-        playerLevel: cfg.myLevel || 1, enemyLevel: cfg.opp.level || 1,
-        playerName: cfg.myName, oppName: cfg.opp.name, oppRating: cfg.opp.mr || 1000
+        playerGear: (cfg.role==='referee'&&cfg.players?cfg.players.a.gear:cfg.myGear) || null,
+        enemyGear: (cfg.role==='referee'&&cfg.players?cfg.players.b.gear:cfg.opp.gear) || null,
+        playerLevel: (cfg.role==='referee'&&cfg.players?cfg.players.a.level:cfg.myLevel) || 1,
+        enemyLevel: (cfg.role==='referee'&&cfg.players?cfg.players.b.level:cfg.opp.level) || 1,
+        playerName: (cfg.role==='referee'&&cfg.players?cfg.players.a.name:cfg.myName),
+        oppName: (cfg.role==='referee'&&cfg.players?cfg.players.b.name:cfg.opp.name),
+        oppRating: (cfg.role==='referee'&&cfg.players?cfg.players.b.mr:cfg.opp.mr) || 1000
       });
       this.battle = battle;
       this.p = battle.p; this.e = battle.e; this.cfg = battle.cfg;
@@ -3916,19 +3982,22 @@ window.ML_FIREBASE_CONFIG = {
       this._slots = { p: {1:[],2:[],3:[]}, e: {1:[],2:[],3:[]} };
       this._qSeq = {p:0,e:0};
       this._qState = {p:null,e:null};
-      this._processedAns = {e:null};
+      this._processedAns = {p:null,e:null};
       this._timerP = null; this._timerE = null;
       this._lastHostAction = 0;
+      this._lastHostFrameSeq = 0;
 
       const self = this;
+      this._hostBridgeCount = 0;
+      this._hostAttackBridgeCount = 0;
       // Pre-generate three independent question lanes for each player.
       [1,2,3].forEach(function(d){
         self._slots.p[d].push(self._makeNetQuestion(d));
         self._slots.e[d].push(self._makeNetQuestion(d));
       });
 
-      // Teruskan SEMUA event engine host ke frame online. Tanpa ini Guest
-      // tidak pernah menerima hasil jawaban/serangan walaupun Host berjalan normal.
+      // Event engine asli dikirim ke Firebase untuk Guest.
+      // UI Host berlangganan langsung ke engine melalui on() override V22.
       ['answered','attack','skill'].forEach(function(name){
         battle.on(name, function(data){
           const safe = JSON.parse(JSON.stringify(data || {}));
@@ -3957,7 +4026,35 @@ window.ML_FIREBASE_CONFIG = {
         self._watchStale('guestAlive', d);
         if (d.surrender) { battle._finish('p','SURRENDER'); return; }
 
-        // Guest answers its own independent question (side e on host engine).
+        // ROOT FIX V20.2:
+        // Guest sudah merender dari Firebase frame. Host sebelumnya TIDAK pernah
+        // memutar ulang frame miliknya sendiri, sehingga engine/audio berjalan
+        // tetapi HUD dan pose Host tidak mengikuti jalur render yang sama.
+        // Host sekarang memakai pipeline render yang SAMA seperti Guest.
+        if (d.frame && d.frame.seq && d.frame.seq > self._lastHostFrameSeq) {
+          self._lastHostFrameSeq=d.frame.seq;
+
+          // Jangan menulis balik state ke engine; engine Host adalah sumber otoritatif.
+          // Frame hanya menjadi sumber render UI yang identik dengan Guest.
+          const frameState={
+            hpP:d.frame.hpP, hpE:d.frame.hpE,
+            enP:d.frame.enP, enE:d.frame.enE,
+            cbP:d.frame.cbP, cbE:d.frame.cbE,
+            shP:d.frame.shP, shE:d.frame.shE
+          };
+          self.emit('state',frameState);
+          (d.frame.evts||[]).forEach(function(ev){
+            self.emit(ev.n,ev.d);
+          });
+        }
+
+        // Player A dan Player B mengirim jawaban ke wasit.
+        const ansP=d.ansP;
+        if(ansP && ansP.by==='playerA' && ansP.qid && ansP.qid!==self._processedAns.p){
+          self._processedAns.p=ansP.qid;
+          self._answerSide('p', Number(ansP.choice), Number(ansP.timeUsed), ansP.qid);
+        }
+        // Player B memakai lane e.
         const ans=d.ansE;
         if (ans && ans.by==='guest' && ans.qid && ans.qid!==self._processedAns.e) {
           self._processedAns.e=ans.qid;
@@ -4010,7 +4107,9 @@ window.ML_FIREBASE_CONFIG = {
       this._qState[side]={payload:payload, q:q, answered:false, startedAt:Date.now()};
       if(side==='p'){
         this.p.answered=false;
-        this.q=q; this._answeredLocal=false; this._qRecvAt=Date.now(); this.qLimit=payload.limit;
+        this.q=q; this._answeredLocal=false; this.qLimit=payload.limit;
+        // Mirror question into real Battle because Host UI V23 attaches there.
+        if(this.battle){ this.battle.q=q; this.battle.qLimit=payload.limit; }
         this.emit('question',{q:q,round:seq,maxRounds:999,limit:payload.limit,pEnergy:this.p.energy,eEnergy:this.e.energy,parallel:true,side:'p',qid:payload.qid});
         this._startLocalTimer('p',payload.limit);
         this._write({qP:payload, ansE:null});
@@ -4063,7 +4162,63 @@ window.ML_FIREBASE_CONFIG = {
       if(side==='e' && this._timerE){clearInterval(this._timerE);this._timerE=null;}
       const b=this.battle;
       b.q=st.q; b.qLimit=st.payload.limit; b.qStart=st.startedAt;
+
+      // Simpan state sebelum engine berjalan. Ini dipakai sebagai fallback
+      // bila bridge event Battle -> NetBattle gagal pada sisi Host.
+      const before = {
+        hpP:b.p.hp, hpE:b.e.hp,
+        enP:b.p.energy, enE:b.e.energy,
+        cbP:b.p.combo, cbE:b.e.combo,
+        shP:b.p.shield, shE:b.e.shield
+      };
+      const attackBridgeBefore=this._hostAttackBridgeCount||0;
+
       b.netAnswer(side,index,Math.max(0,Math.min(Number(timeUsed)||st.payload.limit,st.payload.limit)));
+
+      // HUD Host selalu menerima state final, tanpa menunggu Firebase.
+      const after = {
+        hpP:b.p.hp, hpE:b.e.hp,
+        enP:b.p.energy, enE:b.e.energy,
+        cbP:b.p.combo, cbE:b.e.combo,
+        shP:b.p.shield, shE:b.e.shield
+      };
+      this.emit('state', after);
+
+      // Fallback penting: jika engine benar-benar mengubah HP tetapi event attack
+      // tidak sampai ke NetBattle/UI Host, bangun event attack lokal dari state.
+      // Tidak dikirim ke Firebase sehingga Guest tidak menerima duplikasi.
+      let directAttack = null;
+      if (this.role==='host' && (this._hostAttackBridgeCount||0)===attackBridgeBefore &&
+          (before.hpP!==after.hpP || before.hpE!==after.hpE)) {
+        const from=side==='p'?'p':'e';
+        const to=side==='p'?'e':'p';
+        const dmg=Math.max(0, (to==='p'?before.hpP:before.hpE) - (to==='p'?after.hpP:after.hpE));
+        directAttack={
+          from:from,to:to,dmg:dmg,crit:false,meteor:false,comeback:false,
+          heal:0,drain:false,grade:'HIT',
+          combo:from==='p'?after.cbP:after.cbE,tags:[],
+          hpP:after.hpP,hpE:after.hpE,shield:to==='p'?after.shP:after.shE,
+          fallback:true
+        };
+        this.emit('attack',directAttack);
+      }
+
+      // ROOT FIX V20:
+      // Host tidak lagi hanya bergantung pada emitter NetBattle. Pada beberapa
+      // alur browser, Battle Engine sudah selesai menghitung damage tetapi listener
+      // UI Host tidak menerima event relay. Karena UI dan NetBattle berada pada
+      // halaman yang sama, lakukan sinkronisasi DOM Host langsung sebagai fallback.
+      if (this.role==='host' && G.ML && G.ML.UI && G.ML.UI.B && G.ML.UI.B.engine===this) {
+        try {
+          const ui=G.ML.UI;
+          if (typeof ui._onNetState==='function') ui._onNetState(after);
+          if (directAttack && typeof ui._onAttack==='function') ui._onAttack(directAttack);
+          // Jika bridge attack sebenarnya ada, UI sudah menerima event normal.
+          // State langsung tetap aman karena hanya memperbarui angka HUD.
+        } catch(err) {
+          if (G.console) console.error('[ML HOST DIRECT UI]',err);
+        }
+      }
       return true;
     }
 
@@ -4090,18 +4245,25 @@ window.ML_FIREBASE_CONFIG = {
         if(d.qP && d.qP.qid && d.qP.qid!==self._lastHostQId){
           self._lastHostQId=d.qP.qid; self._applyOpponentQuestion(d.qP);
         }
-        if(d.qE && d.qE.qid && d.qE.qid!==self._lastQId){
-          self._lastQId=d.qE.qid;
-          const q={text:d.qE.text,choices:d.qE.choices,answerIndex:d.qE.answerIndex,topic:d.qE.topic,difficulty:d.qE.difficulty,explanation:'',answer:String(d.qE.choices[d.qE.answerIndex])};
-          self.q=q; self._qState.p={payload:d.qE,q:q,answered:false,startedAt:Date.now()}; self._answeredLocal=false; self._qRecvAt=Date.now();
-          self.emit('question',{q:q,round:d.qE.round,maxRounds:999,limit:d.qE.limit||10,pEnergy:self.p.energy,eEnergy:self.e.energy,parallel:true,side:'p',qid:d.qE.qid});
-          self._startGuestTimer(d.qE);
+        const myQ = self.role==='playerA' ? d.qP : d.qE;
+        if(myQ && myQ.qid && myQ.qid!==self._lastQId){
+          self._lastQId=myQ.qid;
+          const q={text:myQ.text,choices:myQ.choices,answerIndex:myQ.answerIndex,topic:myQ.topic,difficulty:myQ.difficulty,explanation:'',answer:String(myQ.choices[myQ.answerIndex])};
+          self.q=q; self._qState.p={payload:myQ,q:q,answered:false,startedAt:Date.now()}; self._answeredLocal=false; self._qRecvAt=Date.now();
+          self.emit('question',{q:q,round:myQ.round,maxRounds:999,limit:myQ.limit||10,pEnergy:self.p.energy,eEnergy:self.e.energy,parallel:true,side:'p',qid:myQ.qid});
+          self._startGuestTimer(myQ);
         }
         if(d.frame && d.frame.seq && d.frame.seq>self._lastFrameSeq){
           self._lastFrameSeq=d.frame.seq;
-          self.e.hp=d.frame.hpP; self.e.energy=d.frame.enP; self.e.combo=d.frame.cbP; self.e.shield=d.frame.shP; self.e.empowered=d.frame.empP||null;
-          self.p.hp=d.frame.hpE; self.p.energy=d.frame.enE; self.p.combo=d.frame.cbE; self.p.shield=d.frame.shE; self.p.empowered=d.frame.empE||null;
-          (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,remapSides(ev.d)); });
+          if(self.role==='playerA'){
+            self.p.hp=d.frame.hpP; self.p.energy=d.frame.enP; self.p.combo=d.frame.cbP; self.p.shield=d.frame.shP; self.p.empowered=d.frame.empP||null;
+            self.e.hp=d.frame.hpE; self.e.energy=d.frame.enE; self.e.combo=d.frame.cbE; self.e.shield=d.frame.shE; self.e.empowered=d.frame.empE||null;
+            (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,ev.d); });
+          } else {
+            self.e.hp=d.frame.hpP; self.e.energy=d.frame.enP; self.e.combo=d.frame.cbP; self.e.shield=d.frame.shP; self.e.empowered=d.frame.empP||null;
+            self.p.hp=d.frame.hpE; self.p.energy=d.frame.enE; self.p.combo=d.frame.cbE; self.p.shield=d.frame.shE; self.p.empowered=d.frame.empE||null;
+            (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,remapSides(ev.d)); });
+          }
         }
         if(d.status==='done'&&d.result&&!self.finished){
           self.finished=true; if(self._timerIv){clearInterval(self._timerIv);self._timerIv=null;}
@@ -4159,7 +4321,28 @@ window.ML_FIREBASE_CONFIG = {
       const self = this;
       this._unsubRoom = this.fb.fs.onSnapshot(this.roomRef, function (snap) {
         if (!snap.exists()) return;
-        const d = snap.data();
+        const d = snap.data() || {};
+
+        // WASIT: gunakan hero dan nama yang BENAR dari room, bukan default Raka.
+        const hostId = d.hostHero || (d.heroes && d.heroes.host) || null;
+        const guestId = d.guestHero || (d.heroes && d.heroes.guest) || null;
+        const hostName = d.hostName || (d.names && d.names.host) || 'HOST';
+        const guestName = d.guestName || (d.names && d.names.guest) || 'GUEST';
+        let metaChanged = false;
+        if (hostId) { const h=self._heroDef(hostId); if (!self.p.hero || self.p.hero.id!==h.id) { self.p.hero=h; self.p.maxHp=h.hp; if (!d.frame) self.p.hp=h.hp; metaChanged=true; } }
+        if (guestId) { const g=self._heroDef(guestId); if (!self.e.hero || self.e.hero.id!==g.id) { self.e.hero=g; self.e.maxHp=g.hp; if (!d.frame) self.e.hp=g.hp; metaChanged=true; } }
+        if (self.cfg.playerName!==hostName || self.ai.level.bot!==guestName || metaChanged) {
+          self.cfg.playerName=hostName; self.ai.level.bot=guestName;
+          self.emit('watchmeta',{hostHero:self.p.hero,guestHero:self.e.hero,hostName:hostName,guestName:guestName});
+        }
+
+        if (d.frame && d.frame.seq > self._lastSeq) {
+          self._lastSeq = d.frame.seq;
+          self.p.hp = d.frame.hpP; self.p.energy = d.frame.enP; self.p.combo = d.frame.cbP; self.p.shield = d.frame.shP;
+          self.e.hp = d.frame.hpE; self.e.energy = d.frame.enE; self.e.combo = d.frame.cbE; self.e.shield = d.frame.shE;
+          self.emit('state',{hpP:self.p.hp,hpE:self.e.hp,enP:self.p.energy,enE:self.e.energy,cbP:self.p.combo,cbE:self.e.combo,shP:self.p.shield,shE:self.e.shield});
+          (d.frame.evts || []).forEach(function (ev) { self.emit(ev.n, ev.d); });
+        }
         if (d.q && d.q.round > self._lastQRound) {
           self._lastQRound = d.q.round;
           self.q = {
@@ -4177,12 +4360,6 @@ window.ML_FIREBASE_CONFIG = {
             q: self.q, round: d.q.round, maxRounds: self.maxRounds, limit: total,
             pEnergy: self.p.energy, eEnergy: self.e.energy
           });
-        }
-        if (d.frame && d.frame.seq > self._lastSeq) {
-          self._lastSeq = d.frame.seq;
-          self.e.hp = d.frame.hpP; self.e.energy = d.frame.enP; self.e.combo = d.frame.cbP; self.e.shield = d.frame.shP;
-          self.p.hp = d.frame.hpE; self.p.energy = d.frame.enE; self.p.combo = d.frame.cbE; self.p.shield = d.frame.shE;
-          (d.frame.evts || []).forEach(function (ev) { self.emit(ev.n, ev.d); }); // tanpa pembalikan: p=host
         }
         if (d.status === 'done' && d.result && !self.finished) {
           self.finished = true;
@@ -4204,13 +4381,22 @@ window.ML_FIREBASE_CONFIG = {
         this._issueQuestion('e',2);
       }
     }
+    _forceHostRender(){ /* V22 legacy renderer disabled */ }
+
     playerAnswer(i){
       if(this.role==='watch'||this.finished||this._answeredLocal||!this.q)return;
       this._answeredLocal=true;
       const st=this._qState.p;if(!st)return;
       if(this.role==='host'){
-        this._answerSide('p',i,(Date.now()-st.startedAt)/1000,st.payload.qid);
-        return;
+        const ok=this._answerSide('p',i,(Date.now()-st.startedAt)/1000,st.payload.qid);
+        return ok;
+      }
+      if(this.role==='playerA'){
+        const usedA=Math.max(0.1,Math.min((Date.now()-st.startedAt)/1000,st.payload.limit||10));
+        st.answered=true;
+        if(this._timerIv){clearInterval(this._timerIv);this._timerIv=null;}
+        this._write({ansP:{by:'playerA',qid:st.payload.qid,choice:i,timeUsed:Math.round(usedA*10)/10}});
+        return true;
       }
       const used=Math.max(0.1,Math.min((Date.now()-st.startedAt)/1000,st.payload.limit||10));
       const ok=i===st.payload.answerIndex;
@@ -4280,22 +4466,24 @@ window.ML_FIREBASE_CONFIG = {
       self._flushT = setTimeout(function () { self._flushT = null; self._flushNow(); }, 220);
     }
     _flushNow() {
-      if (!this._pendingEvts.length) return;
+      // Frame adalah sumber render bersama untuk Guest, Wasit, dan sekarang Host.
+      // Tetap kirim state meskipun antrean event kosong.
+      if (!this.battle) return;
       const evts = this._pendingEvts;
       this._pendingEvts = [];
       const b = this.battle;
-      this._write({
-        seq: Date.now(),
-        frame: {
-          seq: Date.now(),
-          evts: evts,
-          hpP: b.p.hp, hpE: b.e.hp,
-          enP: b.p.energy, enE: b.e.energy,
-          cbP: b.p.combo, cbE: b.e.combo,
-          shP: b.p.shield, shE: b.e.shield,
-          empE: b.e.empowered || null
-        }
-      });
+      const now=Date.now();
+      const frame={
+        seq: now, evts: evts,
+        hpP:b.p.hp, hpE:b.e.hp,
+        enP:b.p.energy, enE:b.e.energy,
+        cbP:b.p.combo, cbE:b.e.combo,
+        shP:b.p.shield, shE:b.e.shield,
+        empP:b.p.empowered || null, empE:b.e.empowered || null
+      };
+      // State tetap dipancarkan untuk HUD yang membutuhkan angka terbaru.
+      if(this.role==='host') this.emit('state',frame);
+      this._write({seq:now,frame:frame});
     }
     _watchStale(field, d) {
       const t = d[field] || 0;
@@ -4998,6 +5186,8 @@ window.ML_FIREBASE_CONFIG = {
       on('answered', function (d) { self._onAnswered(d); });
       on('attack', function (d) { self._onAttack(d); });
       on('skill', function (d) { self._onSkill(d); });
+      on('state', function (d) { self._onNetState(d); });
+      on('watchmeta', function (d) { self._onWatchMeta(d); });
       on('difficulty', function (d) { self.showDifficultyChoice(d.difficulty); });
     },
 
@@ -5007,6 +5197,35 @@ window.ML_FIREBASE_CONFIG = {
       B.offs = [];
       B.engine = null;
       B.lastPick = null;
+    },
+
+    _onWatchMeta: function (d) {
+      const engine=this.B.engine;
+      if (!engine || !d) return;
+      if (d.hostHero) {
+        el('b-p-ava').innerHTML=heroImg(d.hostHero);
+        el('b-hero-p').innerHTML=heroBody(d.hostHero,'p');
+      }
+      if (d.guestHero) {
+        el('b-e-ava').innerHTML=heroImg(d.guestHero);
+        el('b-hero-e').innerHTML=heroBody(d.guestHero,'e');
+      }
+      el('b-p-name').textContent=d.hostName || 'HOST';
+      el('b-e-name').textContent=d.guestName || 'GUEST';
+      this._updHp(engine.p.hp,engine.p.maxHp,engine.e.hp,engine.e.maxHp);
+    },
+
+    _onNetState: function (d) {
+      const engine = this.B.engine;
+      if (!engine || !d) return;
+      if (Number.isFinite(Number(d.hpP)) && Number.isFinite(Number(d.hpE))) {
+        this._updHp(Number(d.hpP), engine.p.maxHp, Number(d.hpE), engine.e.maxHp);
+      }
+      if (d.enP != null && d.enE != null) this._updEnergy(Number(d.enP), Number(d.enE));
+      if (d.cbP != null) this._updCombo('p', Number(d.cbP));
+      if (d.cbE != null) this._updCombo('e', Number(d.cbE));
+      if (d.shP != null && d.shE != null) this._updShield(Number(d.shP), Number(d.shE));
+      this._updSkillBtn();
     },
 
     _updHp: function (hpP, maxP, hpE, maxE) {
@@ -5167,7 +5386,9 @@ window.ML_FIREBASE_CONFIG = {
     _onAttack: function (d) {
       const engine = this.B.engine;
       if (!engine) return;
-      this._updHp(d.hpP, engine.p.maxHp, d.hpE, engine.e.maxHp);
+      const hpP = Number.isFinite(Number(d.hpP)) ? Number(d.hpP) : Number(engine.p.hp);
+      const hpE = Number.isFinite(Number(d.hpE)) ? Number(d.hpE) : Number(engine.e.hp);
+      this._updHp(hpP, engine.p.maxHp, hpE, engine.e.maxHp);
       this._updShield(engine.p.shield, engine.e.shield);
 
       // animasi hero
@@ -5336,9 +5557,11 @@ window.ML_FIREBASE_CONFIG = {
       myName: P.data.name || 'PEMAIN',
       myGear: P.computeGear(P.data.hero),
       myLevel: ML.Rules.levelFromXP(P.data.xp).level,
-      opp: info.opp
+      opp: info.opp,
+      players: info.players || null
     });
     App.battle = net;
+
     UI.attachBattle(net);
     net.on('end', function (res) { onEngineEnd(net, res, null); });
     net.on('aborted', function () {
@@ -5462,7 +5685,7 @@ window.ML_FIREBASE_CONFIG = {
         try {
           const code = ML.PVP.makeCode();      // kode dibuat SEBELUM modal -> selalu tampil
           UI.roomModal(code, function () { if (handle) handle.cancel(); });
-          handle = ML.PVP.createRoom(Bc._fb, me, code,
+          handle = ML.PVP.createRefereeRoom(Bc._fb, code,
             function (info) { UI.closeModal(); startNetBattle(info); },
             function (err) {
               UI.closeModal();
@@ -5489,7 +5712,7 @@ window.ML_FIREBASE_CONFIG = {
         UI.inputModal('🔑 Gabung Ruangan', 'Masukkan kode 5 karakter dari pembuat ruangan.', 'KODE', 'GABUNG ⚔️', function (code) {
           let handle = null;
           UI.searchingModal(function () { if (handle) handle.cancel(); });
-          handle = ML.PVP.joinRoom(Bj._fb, { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) }, code,
+          handle = ML.PVP.joinRefereeRoom(Bj._fb, { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) }, code,
             function (info) { UI.closeModal(); startNetBattle(info); },
             function (err) {
               UI.closeModal();

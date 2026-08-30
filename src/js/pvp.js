@@ -363,6 +363,65 @@
     }};
   };
 
+  /* ================= V24: REFEREE + PLAYER A + PLAYER B ================= */
+  PVP.createRefereeRoom = function(fb, code, onReady, onFail, onState){
+    const fs=fb.fs, db=fb.db, uid=getUid(fb);
+    const c=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!fs||!db||!uid||!c){onFail&&onFail('invalid-room');return {cancel:function(){}};}
+    const ref=fs.doc(db,'rooms',c); let unsub=null, done=false;
+    fs.setDoc(ref,_clean({status:'waiting-players',mode:'referee',refereeUid:uid,playerA:null,playerB:null,createdAt:Date.now(),updatedAt:Date.now()}))
+    .then(function(){
+      onState&&onState('waiting');
+      unsub=fs.onSnapshot(ref,function(snap){
+        if(done||!snap.exists())return;
+        const d=snap.data()||{};
+        if(d.playerA&&d.playerB){
+          done=true; if(unsub)unsub(); onState&&onState('starting');
+          onReady&&onReady({role:'referee',roomId:c,players:{a:d.playerA,b:d.playerB},opp:d.playerB});
+        }
+      },function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
+    }).catch(function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
+    return {code:c,cancel:function(){if(done)return;done=true;if(unsub)unsub();fs.deleteDoc(ref).catch(function(){});onFail&&onFail('cancel');}};
+  };
+
+  PVP.joinRefereeRoom = function(fb, me, code, onFound, onFail, onState){
+    const fs=fb.fs, db=fb.db, uid=getUid(fb);
+    const c=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!fs||!db||!uid||!c){onFail&&onFail('invalid-code');return {cancel:function(){}};}
+    const ref=fs.doc(db,'rooms',c); let unsub=null, done=false, slot=null;
+    const mine=_clean({uid:uid,name:(me.name||'PEMAIN').slice(0,12),hero:me.hero||'raka',mr:isFinite(me.mr)?me.mr:1000,level:me.level||1,gear:me.gear||null});
+    fs.runTransaction(db,async function(tx){
+      const snap=await tx.get(ref);
+      if(!snap.exists())throw new Error('NOT_FOUND');
+      const d=snap.data()||{};
+      if(d.mode!=='referee')throw new Error('WRONG_ROOM');
+      if(d.refereeUid===uid)throw new Error('SELF');
+      if(d.playerA&&d.playerA.uid===uid)return 'A';
+      if(d.playerB&&d.playerB.uid===uid)return 'B';
+      if(!d.playerA){tx.set(ref,_clean({playerA:mine,updatedAt:Date.now()}),{merge:true});return 'A';}
+      if(!d.playerB){tx.set(ref,_clean({playerB:mine,status:'ready',updatedAt:Date.now()}),{merge:true});return 'B';}
+      throw new Error('FULL');
+    }).then(function(which){
+      slot=which; onState&&onState(which==='A'?'waiting-player-b':'starting');
+      unsub=fs.onSnapshot(ref,function(snap){
+        if(done||!snap.exists())return;
+        const d=snap.data()||{};
+        if((d.status==='playing'||d.status==='done')&&d.playerA&&d.playerB){
+          done=true;if(unsub)unsub();
+          const opp=slot==='A'?d.playerB:d.playerA;
+          onFound&&onFound({role:slot==='A'?'playerA':'playerB',roomId:c,opp:opp,players:{a:d.playerA,b:d.playerB}});
+        }
+      },function(e){if(!done){done=true;onFail&&onFail(String(e&&(e.code||e.message)||e));}});
+    }).catch(function(e){
+      const m=String(e&&(e.code||e.message)||e);
+      if(/NOT_FOUND/i.test(m))onFail&&onFail('notfound');
+      else if(/FULL/i.test(m))onFail&&onFail('full');
+      else if(/SELF/i.test(m))onFail&&onFail('self');
+      else onFail&&onFail(m);
+    });
+    return {cancel:function(){if(done)return;done=true;if(unsub)unsub();onFail&&onFail('cancel');}};
+  };
+
   PVP.joinRoom = function (fb, me, code, onFound, onFail, onState) {
     const fs = fb.fs, db = fb.db, uid = getUid(fb);
       if (!fs || !db || !uid) { onFail && onFail('firebase-user-unavailable'); return { cancel: function () {} }; }
@@ -458,9 +517,9 @@
       this._processedAnsRound = -1;
       this._skillReqSent = false;
       this._difficultyReqSent = false;
-      this._mySide = cfg.role === 'host' ? 'p' : 'e'; // sisi engine (host selalu 'p')
+      this._mySide = (cfg.role === 'host' || cfg.role === 'referee' || cfg.role === 'playerA') ? 'p' : 'e';
 
-      if (cfg.role === 'host') this._initHost();
+      if (cfg.role === 'host' || cfg.role === 'referee') this._initHost();
       else if (cfg.role === 'watch') this._initWatch();
       else this._initGuest();
     }
@@ -475,11 +534,16 @@
     _initHost() {
       const cfg = this.cfgPvp;
       const battle = new ML.Battle({
-        heroId: cfg.myHeroId, aiHeroId: cfg.opp.hero, aiLevelIdx: 2,
+        heroId: (cfg.role==='referee'&&cfg.players?cfg.players.a.hero:cfg.myHeroId),
+        aiHeroId: (cfg.role==='referee'&&cfg.players?cfg.players.b.hero:cfg.opp.hero), aiLevelIdx: 2,
         netMode: true, practice: false,
-        playerGear: cfg.myGear || null, enemyGear: cfg.opp.gear || null,
-        playerLevel: cfg.myLevel || 1, enemyLevel: cfg.opp.level || 1,
-        playerName: cfg.myName, oppName: cfg.opp.name, oppRating: cfg.opp.mr || 1000
+        playerGear: (cfg.role==='referee'&&cfg.players?cfg.players.a.gear:cfg.myGear) || null,
+        enemyGear: (cfg.role==='referee'&&cfg.players?cfg.players.b.gear:cfg.opp.gear) || null,
+        playerLevel: (cfg.role==='referee'&&cfg.players?cfg.players.a.level:cfg.myLevel) || 1,
+        enemyLevel: (cfg.role==='referee'&&cfg.players?cfg.players.b.level:cfg.opp.level) || 1,
+        playerName: (cfg.role==='referee'&&cfg.players?cfg.players.a.name:cfg.myName),
+        oppName: (cfg.role==='referee'&&cfg.players?cfg.players.b.name:cfg.opp.name),
+        oppRating: (cfg.role==='referee'&&cfg.players?cfg.players.b.mr:cfg.opp.mr) || 1000
       });
       this.battle = battle;
       this.p = battle.p; this.e = battle.e; this.cfg = battle.cfg;
@@ -489,7 +553,7 @@
       this._slots = { p: {1:[],2:[],3:[]}, e: {1:[],2:[],3:[]} };
       this._qSeq = {p:0,e:0};
       this._qState = {p:null,e:null};
-      this._processedAns = {e:null};
+      this._processedAns = {p:null,e:null};
       this._timerP = null; this._timerE = null;
       this._lastHostAction = 0;
       this._lastHostFrameSeq = 0;
@@ -555,7 +619,13 @@
           });
         }
 
-        // Guest answers its own independent question (side e on host engine).
+        // Player A dan Player B mengirim jawaban ke wasit.
+        const ansP=d.ansP;
+        if(ansP && ansP.by==='playerA' && ansP.qid && ansP.qid!==self._processedAns.p){
+          self._processedAns.p=ansP.qid;
+          self._answerSide('p', Number(ansP.choice), Number(ansP.timeUsed), ansP.qid);
+        }
+        // Player B memakai lane e.
         const ans=d.ansE;
         if (ans && ans.by==='guest' && ans.qid && ans.qid!==self._processedAns.e) {
           self._processedAns.e=ans.qid;
@@ -746,18 +816,25 @@
         if(d.qP && d.qP.qid && d.qP.qid!==self._lastHostQId){
           self._lastHostQId=d.qP.qid; self._applyOpponentQuestion(d.qP);
         }
-        if(d.qE && d.qE.qid && d.qE.qid!==self._lastQId){
-          self._lastQId=d.qE.qid;
-          const q={text:d.qE.text,choices:d.qE.choices,answerIndex:d.qE.answerIndex,topic:d.qE.topic,difficulty:d.qE.difficulty,explanation:'',answer:String(d.qE.choices[d.qE.answerIndex])};
-          self.q=q; self._qState.p={payload:d.qE,q:q,answered:false,startedAt:Date.now()}; self._answeredLocal=false; self._qRecvAt=Date.now();
-          self.emit('question',{q:q,round:d.qE.round,maxRounds:999,limit:d.qE.limit||10,pEnergy:self.p.energy,eEnergy:self.e.energy,parallel:true,side:'p',qid:d.qE.qid});
-          self._startGuestTimer(d.qE);
+        const myQ = self.role==='playerA' ? d.qP : d.qE;
+        if(myQ && myQ.qid && myQ.qid!==self._lastQId){
+          self._lastQId=myQ.qid;
+          const q={text:myQ.text,choices:myQ.choices,answerIndex:myQ.answerIndex,topic:myQ.topic,difficulty:myQ.difficulty,explanation:'',answer:String(myQ.choices[myQ.answerIndex])};
+          self.q=q; self._qState.p={payload:myQ,q:q,answered:false,startedAt:Date.now()}; self._answeredLocal=false; self._qRecvAt=Date.now();
+          self.emit('question',{q:q,round:myQ.round,maxRounds:999,limit:myQ.limit||10,pEnergy:self.p.energy,eEnergy:self.e.energy,parallel:true,side:'p',qid:myQ.qid});
+          self._startGuestTimer(myQ);
         }
         if(d.frame && d.frame.seq && d.frame.seq>self._lastFrameSeq){
           self._lastFrameSeq=d.frame.seq;
-          self.e.hp=d.frame.hpP; self.e.energy=d.frame.enP; self.e.combo=d.frame.cbP; self.e.shield=d.frame.shP; self.e.empowered=d.frame.empP||null;
-          self.p.hp=d.frame.hpE; self.p.energy=d.frame.enE; self.p.combo=d.frame.cbE; self.p.shield=d.frame.shE; self.p.empowered=d.frame.empE||null;
-          (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,remapSides(ev.d)); });
+          if(self.role==='playerA'){
+            self.p.hp=d.frame.hpP; self.p.energy=d.frame.enP; self.p.combo=d.frame.cbP; self.p.shield=d.frame.shP; self.p.empowered=d.frame.empP||null;
+            self.e.hp=d.frame.hpE; self.e.energy=d.frame.enE; self.e.combo=d.frame.cbE; self.e.shield=d.frame.shE; self.e.empowered=d.frame.empE||null;
+            (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,ev.d); });
+          } else {
+            self.e.hp=d.frame.hpP; self.e.energy=d.frame.enP; self.e.combo=d.frame.cbP; self.e.shield=d.frame.shP; self.e.empowered=d.frame.empP||null;
+            self.p.hp=d.frame.hpE; self.p.energy=d.frame.enE; self.p.combo=d.frame.cbE; self.p.shield=d.frame.shE; self.p.empowered=d.frame.empE||null;
+            (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,remapSides(ev.d)); });
+          }
         }
         if(d.status==='done'&&d.result&&!self.finished){
           self.finished=true; if(self._timerIv){clearInterval(self._timerIv);self._timerIv=null;}
@@ -883,9 +960,14 @@
       const st=this._qState.p;if(!st)return;
       if(this.role==='host'){
         const ok=this._answerSide('p',i,(Date.now()-st.startedAt)/1000,st.payload.qid);
-        // _answeredLocal hanya mencegah double-click pada soal aktif.
-        // Soal berikutnya akan dibuat oleh _issueQuestion dan harus aktif lagi.
         return ok;
+      }
+      if(this.role==='playerA'){
+        const usedA=Math.max(0.1,Math.min((Date.now()-st.startedAt)/1000,st.payload.limit||10));
+        st.answered=true;
+        if(this._timerIv){clearInterval(this._timerIv);this._timerIv=null;}
+        this._write({ansP:{by:'playerA',qid:st.payload.qid,choice:i,timeUsed:Math.round(usedA*10)/10}});
+        return true;
       }
       const used=Math.max(0.1,Math.min((Date.now()-st.startedAt)/1000,st.payload.limit||10));
       const ok=i===st.payload.answerIndex;
