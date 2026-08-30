@@ -980,6 +980,152 @@ body {
 .account-actions .wide{margin:0!important}
 .account-state{margin-bottom:14px}
 
+/* ================= V25: HASIL WASIT RAPI A vs B ================= */
+.ref-result-modal {
+  width: 100%;
+}
+
+.ref-result-title {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.ref-result-vs {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #64748b;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+
+.ref-result-winner {
+  text-align: center;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 10px 8px;
+  margin-bottom: 10px;
+}
+
+.ref-result-winner small {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.ref-result-winner b {
+  display: block;
+  font-size: 22px;
+  margin-top: 4px;
+  color: #4f46e5;
+}
+
+.ref-result-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.ref-player-card {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 15px;
+  padding: 10px 8px;
+  min-width: 0;
+}
+
+.ref-player-card.winner {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #fffbeb, #ffffff);
+  box-shadow: 0 5px 16px rgba(245, 158, 11, .18);
+}
+
+.ref-slot {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #64748b;
+}
+
+.ref-name {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 900;
+  margin-top: 2px;
+  padding-bottom: 7px;
+  border-bottom: 2px dashed #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ref-player-card.winner .ref-name::before {
+  content: "👑 ";
+}
+
+.ref-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(226, 232, 240, .65);
+}
+
+.ref-stat:last-child {
+  border-bottom: none;
+}
+
+.ref-stat span {
+  color: #64748b;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ref-stat b {
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ref-stat b.up {
+  color: #10b981;
+}
+
+.ref-stat b.down {
+  color: #ef4444;
+}
+
+.ref-result-actions {
+  margin-top: 12px;
+}
+
+@media (max-width: 380px) {
+  .ref-result-grid {
+    gap: 6px;
+  }
+
+  .ref-player-card {
+    padding: 8px 6px;
+  }
+
+  .ref-name {
+    font-size: 12px;
+  }
+
+  .ref-stat {
+    font-size: 10.5px;
+    gap: 4px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -5610,39 +5756,72 @@ window.ML_FIREBASE_CONFIG = {
         const winner=res.draw?'SERI':(res.win?(a.name||'Player A'):(b.name||'Player B'));
 
         function sign(n){return n>0?'+'+n:String(n);}
-        function statBlock(label,c){
-          const r=c.result;
-          const rankMove=c.rankAfter.index>c.rankBefore.index?'⬆️ NAIK':(c.rankAfter.index<c.rankBefore.index?'⬇️ TURUN':'➡️ TETAP');
-          return '<div style="text-align:left;padding:10px 8px;border-top:1px solid rgba(255,255,255,.12)">'+
-            '<b>'+U.esc(label)+'</b>'+
-            '<div style="margin-top:6px;font-size:13px">📈 Rating: <b>'+c.mrBefore+' → '+c.mrAfter+' ('+sign(c.mrDelta)+')</b></div>'+
-            '<div style="margin-top:3px;font-size:13px">🏅 Rank: '+c.rankBefore.icon+' '+U.esc(c.rankBefore.name)+' → '+c.rankAfter.icon+' '+U.esc(c.rankAfter.name)+' <b>'+rankMove+'</b></div>'+
-            '<div style="margin-top:3px;font-size:13px">🎯 Benar: '+(r.correct||0)+'/'+(r.questions||0)+' · Akurasi: '+Math.round((r.accuracy||0)*100)+'% · 🔥 Combo: '+(r.maxCombo||0)+'</div>'+
-            '<div style="margin-top:3px;font-size:13px">💥 Damage: '+Math.round(r.dmgDealt||0)+' · ⭐ Perfect: '+(r.perfect||0)+' · ⏱️ Rata-rata: '+Number(r.avgTime||0).toFixed(1)+' dtk</div>'+
-          '</div>';
-        }
+        function playerCard(slot,label,c,isWinner){
+ const r=c.result || {};
+ const rankMove=c.rankAfter.index>c.rankBefore.index?'NAIK':(c.rankAfter.index<c.rankBefore.index?'TURUN':'TETAP');
+ const status=r.draw?'SERI':(r.win?'MENANG':'KALAH');
 
-        setTimeout(function(){
-          UI.detachBattle();
-          net.destroy();
-          if(App.battle===net) App.battle=null;
-          UI.show('home');
-          UI.modal(
-            '<h3>🏁 HASIL PERTANDINGAN</h3>'+
-            '<p style="text-align:center;font-size:18px;margin:8px 0 14px"><b>'+U.esc(a.name||'PLAYER A')+' vs '+U.esc(b.name||'PLAYER B')+'</b></p>'+
-            '<div class="result-score" style="text-align:center;padding:12px 8px;margin-bottom:12px">'+
-            '<div style="font-size:13px;opacity:.75">PEMENANG</div>'+
-            '<div style="font-size:24px;font-weight:900;margin-top:5px">'+(res.draw?'🤝 SERI':'🏆 '+U.esc(winner))+'</div>'+
-            '</div>'+
-            '<div style="font-size:14px;font-weight:800;margin:4px 0 4px">📊 RATING, RANK & STATISTIK</div>'+
-            statBlock(a.name||'PLAYER A',ca)+
-            statBlock(b.name||'PLAYER B',cb)+
-            '<div class="m-actions"><button class="btn primary" data-ref-result="close">SELESAI</button></div>'
-          );
-          const modalRoot=document.getElementById('modal-root');
-          const btn=modalRoot&&modalRoot.querySelector('[data-ref-result="close"]');
-          if(btn)btn.addEventListener('click',function(){UI.closeModal();});
-        },1100);
+ return '<div class="ref-player-card'+(isWinner?' winner':'')+'">'+
+ '<div class="ref-slot">'+U.esc(slot)+'</div>'+
+ '<div class="ref-name">'+U.esc(label)+'</div>'+
+
+ '<div class="ref-stat"><span>Status</span><b class="'+(r.draw?'':(r.win?'up':'down'))+'">'+status+'</b></div>'+
+
+ '<div class="ref-stat"><span>Rating</span><b>'+c.mrBefore+' → '+c.mrAfter+'</b></div>'+
+ '<div class="ref-stat"><span>Δ Rating</span><b class="'+(c.mrDelta>=0?'up':'down')+'">'+sign(c.mrDelta)+'</b></div>'+
+
+ '<div class="ref-stat"><span>Rank</span><b>'+c.rankAfter.icon+' '+U.esc(c.rankAfter.name)+'</b></div>'+
+ '<div class="ref-stat"><span>Perubahan</span><b>'+rankMove+'</b></div>'+
+ '<div class="ref-stat"><span>RP</span><b class="'+(c.rpDelta>=0?'up':'down')+'">'+sign(c.rpDelta)+' RP</b></div>'+
+
+ '<div class="ref-stat"><span>Benar</span><b>'+(r.correct||0)+'/'+(r.questions||0)+'</b></div>'+
+ '<div class="ref-stat"><span>Akurasi</span><b>'+Math.round((r.accuracy||0)*100)+'%</b></div>'+
+ '<div class="ref-stat"><span>Combo</span><b>'+(r.maxCombo||0)+'x</b></div>'+
+ '<div class="ref-stat"><span>Damage</span><b>'+Math.round(r.dmgDealt||0)+'</b></div>'+
+ '<div class="ref-stat"><span>Perfect</span><b>'+(r.perfect||0)+'</b></div>'+
+ '<div class="ref-stat"><span>Rata-rata</span><b>'+Number(r.avgTime||0).toFixed(1)+'s</b></div>'+
+ '</div>';
+}
+
+setTimeout(function(){
+ UI.detachBattle();
+ net.destroy();
+ if(App.battle===net) App.battle=null;
+ UI.show('home');
+
+ const aWin=!res.draw && res.win;
+ const bWin=!res.draw && !res.win;
+
+ const bd=UI.modal(
+ '<div class="ref-result-modal">'+
+ '<div class="ref-result-title">HASIL PERTANDINGAN</div>'+
+
+ '<div class="ref-result-vs">'+
+ U.esc(a.name||'PLAYER A')+' VS '+U.esc(b.name||'PLAYER B')+
+ '</div>'+
+
+ '<div class="ref-result-winner">'+
+ '<small>PEMENANG</small>'+
+ '<b>'+(res.draw?'🤝 SERI':'🏆 '+U.esc(winner))+'</b>'+
+ '</div>'+
+
+ '<div class="ref-result-grid">'+
+ playerCard('PLAYER A',a.name||'PLAYER A',ca,aWin)+
+ playerCard('PLAYER B',b.name||'PLAYER B',cb,bWin)+
+ '</div>'+
+
+ '<div class="m-actions ref-result-actions">'+
+ '<button class="btn primary" data-ref-result="close" style="grid-column:1/-1">SELESAI</button>'+
+ '</div>'+
+ '</div>'
+ );
+
+ const modalBox=bd&&bd.querySelector('.modal');
+ if(modalBox) modalBox.style.maxWidth='560px';
+
+ const btn=bd&&bd.querySelector('[data-ref-result="close"]');
+ if(btn)btn.addEventListener('click',function(){UI.closeModal();});
+},1100);
       }else{
         onEngineEnd(net, res, null);
       }
