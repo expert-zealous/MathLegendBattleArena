@@ -8946,5 +8946,570 @@ setTimeout(function(){
   }
 })();
 </script>
+<style id="ml-ui-stage1">
+/* ============================================================
+   UI TAHAP 1 — MOBILE GAME SHELL
+   Target: HP portrait, intro + home polish
+   Aman dicabut: hapus tag <style id="ml-ui-stage1"> dan <script> terkait
+   ============================================================ */
+
+/* ——— GLOBAL: background lebih hidup ——— */
+body {
+  background:
+    radial-gradient(ellipse 600px 400px at 80% -5%, rgba(251,191,36,.18), transparent 65%),
+    radial-gradient(ellipse 500px 500px at -5% 100%, rgba(99,102,241,.22), transparent 65%),
+    radial-gradient(ellipse 400px 300px at 50% 50%, rgba(236,72,153,.08), transparent 70%),
+    linear-gradient(155deg, #eef2ff 0%, #f0e8ff 40%, #fdf2f8 70%, #fff5f0 100%) !important;
+}
+
+/* ——— GLOBAL: panel lebih glossy ——— */
+.panel {
+  background: rgba(255,255,255,.95) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.9) !important;
+  box-shadow:
+    0 4px 20px rgba(99,102,241,.10),
+    0 1px 3px rgba(0,0,0,.06),
+    inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+/* ——— GLOBAL: tombol utama lebih game-like ——— */
+.btn.big.primary,
+.btn.big.primary:not(:disabled) {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 40%, #a855f7 100%) !important;
+  box-shadow:
+    0 6px 20px rgba(99,102,241,.40),
+    0 2px 8px rgba(139,92,246,.30),
+    inset 0 1px 0 rgba(255,255,255,.25) !important;
+  text-shadow: 0 2px 4px rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.2) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn.big.primary::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255,255,255,.12) 50%,
+    transparent 70%
+  );
+  animation: btnShine 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes btnShine {
+  0% { transform: translateX(-100%) rotate(25deg); }
+  40%, 100% { transform: translateX(100%) rotate(25deg); }
+}
+
+/* ——— INTRO: lebih dramatis ——— */
+.intro {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 40%, rgba(99,102,241,.12), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 90%, rgba(251,191,36,.10), transparent 60%) !important;
+}
+
+.intro-logo-img {
+  width: clamp(160px, 48vw, 280px) !important;
+  filter: drop-shadow(0 12px 24px rgba(99,102,241,.35)) !important;
+}
+
+.intro .logo.intro-logo {
+  font-size: clamp(22px, 7vw, 32px) !important;
+  text-shadow: 0 2px 8px rgba(99,102,241,.20);
+}
+
+.intro-tagline {
+  font-size: 12px !important;
+  letter-spacing: 8px !important;
+  color: #7c3aed !important;
+  text-shadow: 0 1px 4px rgba(124,58,237,.15);
+}
+
+.intro-heroes {
+  margin: 12px 0 8px !important;
+}
+
+.intro-heroes .ih {
+  width: clamp(52px, 13vw, 74px) !important;
+  height: clamp(70px, 17vw, 98px) !important;
+  filter: drop-shadow(0 6px 12px rgba(99,102,241,.20));
+  transition: transform .3s ease;
+}
+
+.intro-heroes .ih:nth-child(3) {
+  transform: scale(1.12) translateY(-4px);
+}
+
+.intro-btn {
+  min-width: 240px !important;
+  font-size: 20px !important;
+  padding: 18px 28px !important;
+  border-radius: 22px !important;
+  letter-spacing: 2px !important;
+}
+
+.intro-foot {
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+  letter-spacing: 1px;
+}
+
+/* ——— HOME: lobby game feel ——— */
+.home-head {
+  border-radius: 20px !important;
+  padding: 12px 14px !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.97), rgba(238,242,255,.95)) !important;
+  border: 1px solid rgba(165,180,252,.3) !important;
+  box-shadow:
+    0 4px 16px rgba(99,102,241,.10),
+    inset 0 1px 0 rgba(255,255,255,.8) !important;
+}
+
+.hh-name {
+  font-size: 17px !important;
+  letter-spacing: .5px;
+}
+
+.wallet-chip {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  padding: 4px 12px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06) !important;
+}
+
+.wallet-chip.gem {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe) !important;
+}
+
+/* Hero mascot lebih besar */
+.mascot {
+  height: clamp(130px, 28vw, 185px) !important;
+}
+
+.mascot .hero-img {
+  width: clamp(100px, 26vw, 155px) !important;
+  filter: drop-shadow(0 8px 20px rgba(99,102,241,.22)) !important;
+}
+
+/* Logo home lebih compact */
+.home-logo-img {
+  width: clamp(100px, 26vw, 160px) !important;
+}
+
+.tagline {
+  font-size: 12px !important;
+  letter-spacing: 7px !important;
+  color: #7c3aed !important;
+}
+
+/* Tombol MAIN SEKARANG */
+.home .btn.big.primary {
+  font-size: 20px !important;
+  padding: 18px 24px !important;
+  border-radius: 22px !important;
+  letter-spacing: 2px !important;
+}
+
+/* ——— HOME: menu grid lebih game-like ——— */
+.home-grid {
+  gap: 8px !important;
+}
+
+.tile {
+  border-radius: 16px !important;
+  padding: 16px 8px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,252,.95)) !important;
+  border: 1.5px solid rgba(226,232,240,.8) !important;
+  box-shadow:
+    0 3px 12px rgba(99,102,241,.08),
+    inset 0 1px 0 rgba(255,255,255,.9) !important;
+  transition: transform .12s ease, box-shadow .15s ease !important;
+}
+
+.tile:active {
+  transform: scale(.94) !important;
+  box-shadow: 0 1px 4px rgba(99,102,241,.12) !important;
+}
+
+.tile b {
+  font-size: 28px !important;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.10));
+}
+
+.tile span {
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: .8px !important;
+  color: #475569 !important;
+}
+
+/* ——— HOME: footer dan link wasit ——— */
+.home-foot {
+  font-size: 10px !important;
+  color: #94a3b8 !important;
+  padding: 2px 0 4px !important;
+}
+
+.link-btn {
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+  padding: 4px !important;
+}
+
+/* ——— SETUP: hero cards lebih game-like ——— */
+.hero-cards {
+  gap: 8px !important;
+}
+
+.hero-card {
+  border-radius: 16px !important;
+  padding: 14px 8px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,252,.92)) !important;
+  border: 2.5px solid transparent !important;
+  box-shadow:
+    0 3px 12px rgba(99,102,241,.08),
+    inset 0 1px 0 rgba(255,255,255,.8) !important;
+  transition: transform .1s ease, border-color .15s ease, box-shadow .15s ease !important;
+}
+
+.hero-card.sel {
+  border-color: #6366f1 !important;
+  background: linear-gradient(180deg, rgba(238,242,255,.98), rgba(224,231,255,.95)) !important;
+  box-shadow:
+    0 4px 16px rgba(99,102,241,.20),
+    inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+.hero-card:active {
+  transform: scale(.94) !important;
+}
+
+.hc-ava .hero-img {
+  width: 52px !important;
+  height: 52px !important;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.12));
+}
+
+.hc-name {
+  font-size: 13px !important;
+  margin-top: 4px !important;
+}
+
+.hc-role {
+  font-size: 9px !important;
+  letter-spacing: 1.5px !important;
+}
+
+/* ——— SETUP: hero detail panel ——— */
+.hero-detail {
+  border-radius: 18px !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.97), rgba(238,242,255,.92)) !important;
+}
+
+.hero-detail .hd-stats {
+  gap: 6px !important;
+}
+
+.hero-detail .hd-stat {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+  border-radius: 12px !important;
+  padding: 8px 6px !important;
+  border: 1px solid rgba(226,232,240,.6);
+}
+
+.hero-detail .hd-stat b {
+  font-size: 18px !important;
+  color: #4f46e5;
+}
+
+.hero-detail .hd-skill {
+  background: linear-gradient(135deg, #eef2ff, #e8e0ff) !important;
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  border: 1px solid rgba(165,180,252,.3);
+}
+
+/* ——— SETUP: AI chips ——— */
+.ai-chip {
+  border-radius: 14px !important;
+  padding: 10px 6px !important;
+  border-width: 2.5px !important;
+  background: linear-gradient(180deg, #fff, #f8fafc) !important;
+  transition: transform .1s ease, border-color .15s ease !important;
+}
+
+.ai-chip.sel {
+  background: linear-gradient(180deg, #eef2ff, #e0e7ff) !important;
+  border-color: #6366f1 !important;
+  box-shadow: 0 3px 12px rgba(99,102,241,.15) !important;
+}
+
+.ai-chip:active {
+  transform: scale(.95) !important;
+}
+
+.ai-chip b {
+  font-size: 14px !important;
+}
+
+/* ——— SETUP: online buttons ——— */
+.pvp-row .btn {
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  padding: 14px !important;
+}
+
+.pvp-row .btn.online {
+  box-shadow:
+    0 6px 18px rgba(16,185,129,.30),
+    inset 0 1px 0 rgba(255,255,255,.2) !important;
+}
+
+/* ——— RESULT: banner lebih dramatis ——— */
+.res-banner {
+  border-radius: 22px !important;
+  padding: 22px 14px !important;
+  font-size: clamp(30px, 9vw, 44px) !important;
+  letter-spacing: 4px !important;
+}
+
+.res-banner.win {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 40%, #ef4444 100%) !important;
+  box-shadow:
+    0 10px 30px rgba(245,158,11,.40),
+    inset 0 2px 0 rgba(255,255,255,.25) !important;
+  text-shadow: 0 3px 8px rgba(0,0,0,.25);
+}
+
+.res-banner.lose {
+  background: linear-gradient(135deg, #475569 0%, #64748b 100%) !important;
+  box-shadow: 0 10px 26px rgba(71,85,105,.35) !important;
+}
+
+/* ——— RESULT: statistik panel ——— */
+.stat-cell {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(226,232,240,.5);
+  padding: 10px 10px !important;
+}
+
+.stat-cell b {
+  font-size: 20px !important;
+  color: #1e293b;
+}
+
+.stat-cell span {
+  font-size: 10px !important;
+  letter-spacing: .5px;
+}
+
+/* ——— RESULT: actions ——— */
+.res-actions {
+  gap: 8px !important;
+}
+
+.res-actions .btn {
+  border-radius: 16px !important;
+  padding: 16px !important;
+  font-size: 15px !important;
+}
+
+/* ——— GLOBAL: bar progressi lebih tebal ——— */
+.bar {
+  height: 16px !important;
+  border-radius: 99px !important;
+  background: linear-gradient(180deg, #e2e8f0, #cbd5e1) !important;
+}
+
+.bar.tiny {
+  height: 10px !important;
+}
+
+.barfill {
+  border-radius: 99px !important;
+}
+
+.barfill.xp {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+.barfill.rp {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #fde68a) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+/* ——— GLOBAL: page-head lebih game-like ——— */
+.page-head {
+  margin-bottom: 4px !important;
+}
+
+.page-head h2 {
+  font-size: 18px !important;
+  letter-spacing: 1px !important;
+}
+
+.page-head .back {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 14px !important;
+  font-size: 22px !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(238,242,255,.9)) !important;
+  border: 1.5px solid rgba(226,232,240,.6) !important;
+  box-shadow: 0 2px 8px rgba(99,102,241,.08) !important;
+}
+
+/* ——— GLOBAL: su-mode badge ——— */
+.su-mode {
+  font-size: 10px !important;
+  padding: 5px 14px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  box-shadow: 0 2px 8px rgba(99,102,241,.25) !important;
+}
+
+/* ——— GLOBAL: toast lebih game-like ——— */
+.toast {
+  border-radius: 16px !important;
+  padding: 12px 20px !important;
+  font-size: 13px !important;
+  background: linear-gradient(135deg, #1e293b, #334155) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.30) !important;
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.toast.gold {
+  background: linear-gradient(135deg, #f59e0b, #f97316) !important;
+  border: 1px solid rgba(255,255,255,.2);
+}
+
+/* ——— GLOBAL: modal lebih polished ——— */
+.modal {
+  border-radius: 24px !important;
+  padding: 22px !important;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,.25),
+    0 0 0 1px rgba(255,255,255,.1) !important;
+  border: 1px solid rgba(255,255,255,.6);
+}
+
+.modal h3 {
+  font-size: 18px !important;
+}
+
+.modal input {
+  border-radius: 14px !important;
+  padding: 14px !important;
+  font-size: 16px !important;
+  border: 2px solid #e2e8f0 !important;
+  background: linear-gradient(180deg, #fff, #f8fafc) !important;
+}
+
+.modal input:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.12) !important;
+}
+
+/* ——— GLOBAL: room code lebih besar ——— */
+.room-code {
+  font-size: 36px !important;
+  letter-spacing: 10px !important;
+  padding: 10px 18px 10px 28px !important;
+  border-radius: 18px !important;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff) !important;
+  border: 2px dashed #818cf8 !important;
+  color: #4338ca !important;
+}
+
+/* ——— GLOBAL: spinner ——— */
+.spinner {
+  width: 48px !important;
+  height: 48px !important;
+  border-width: 5px !important;
+  border-color: #c7d2fe !important;
+  border-top-color: #6366f1 !important;
+}
+
+/* ——— Scrollbar styling (mobile biasanya hidden) ——— */
+.screen::-webkit-scrollbar {
+  width: 3px;
+}
+
+.screen::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.screen::-webkit-scrollbar-thumb {
+  background: rgba(99,102,241,.15);
+  border-radius: 99px;
+}
+
+/* ——— Animasi ringan untuk tile menu ——— */
+@keyframes tileGlow {
+  0%, 100% { box-shadow: 0 3px 12px rgba(99,102,241,.08); }
+  50% { box-shadow: 0 4px 16px rgba(99,102,241,.14); }
+}
+
+.tile {
+  animation: tileGlow 4s ease-in-out infinite;
+}
+
+.tile:nth-child(2) { animation-delay: .5s; }
+.tile:nth-child(3) { animation-delay: 1s; }
+.tile:nth-child(4) { animation-delay: 1.5s; }
+.tile:nth-child(5) { animation-delay: 2s; }
+.tile:nth-child(6) { animation-delay: 2.5s; }
+</style>
+
+<script>
+/* ============================================================
+   UI TAHAP 1 — Home/Intro label tweak (ringan)
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function waitReady() {
+    if (!window.ML || !ML.UI) return setTimeout(waitReady, 60);
+    tweakUI();
+  }
+
+  function tweakUI() {
+    if (ML._uiStage1) return;
+    ML._uiStage1 = true;
+
+    const UI = ML.UI;
+
+    /* Intro foot: lebih game-like */
+    const introFoot = document.querySelector('.intro-foot');
+    if (introFoot) {
+      introFoot.innerHTML = '⚔️ Jawab soal &bull; Serang lawan &bull; Jadi legenda ⚔️';
+    }
+
+    /* Home: mode wasit lebih kecil */
+    const watchBtn = document.querySelector('#screen-home .link-btn[data-act="watch"]');
+    if (watchBtn) {
+      watchBtn.style.opacity = '0.7';
+      watchBtn.style.fontSize = '10px';
+    }
+
+    console.log('[ML] UI Tahap 1 aktif');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitReady);
+  } else {
+    waitReady();
+  }
+})();
+</script>
 </body>
 </html>
