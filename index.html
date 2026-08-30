@@ -1378,6 +1378,7 @@ body {
           <div class="pf-sub" id="pf-level">Level 1</div>
           <div class="bar tiny"><div class="barfill xp" id="pf-xpfill"></div></div>
           <div class="pf-sub2" id="pf-xptext"></div>
+          <div class="pf-sub2" id="pf-school" style="margin-top:4px"></div>
         </div>
       </div>
       <div class="panel pf-card">
@@ -3084,6 +3085,7 @@ body {
       gearByHero: {},       // atribut terpisah per hero: { heroId: { itemId: level } }
       achievements: {},      // id -> {d:timestamp}
       missions: { date: '', items: {} },
+      school: '',
       settings: { sound: true }
     };
   };
@@ -3557,17 +3559,18 @@ window.ML_FIREBASE_CONFIG = {
     },
 
     /* dipanggil main.js setelah tiap match selesai */
-    onMatchEnd: function (profile) {
-      if (!this.online) return;
-      const R = ML.Rules;
-      this.saveProfile(profile);
-      this.submitScore({
-        name: profile.name || 'PEMAIN',
-        hero: profile.hero,
-        mr: profile.mr,
-        level: R.levelFromXP(profile.xp).level
-      });
-    }
+     onMatchEnd: function (profile) {
+ if (!this.online) return;
+ const R = ML.Rules;
+ this.saveProfile(profile);
+ this.submitScore({
+ name: profile.name || 'PEMAIN',
+ hero: profile.hero,
+ mr: profile.mr,
+ level: R.levelFromXP(profile.xp).level,
+ school: profile.school || ''
+ });
+ }
   });
 })();
 
@@ -5071,7 +5074,28 @@ window.ML_FIREBASE_CONFIG = {
  ML.Backend.topScores(10).then(function (list) {
  if (!list || self.current !== 'leaderboard' || self.boardTab !== tab) return;
  if (tab === 'friends') return; // tab teman: menyusul di tahap berikutnya
- if (tab === 'school') return; // tab sekolah: menyusul di tahap berikutnya
+  if (tab === 'school') {
+ // Filter pemain yang sekolahnya sama.
+ const mySchool = (P.data.school || '').trim().toLowerCase();
+ if (!mySchool) {
+ // Pemain belum mengisi sekolah: tampilkan pesan ajakan.
+ document.getElementById('board-list').innerHTML =
+ '<div class="panel" style="text-align:center;padding:20px;color:#64748b">' +
+ ' <b>Isi nama sekolahmu dulu</b><br>' +
+ '<small>Buka Profil → tap Edit di baris Sekolah</small>' +
+ '</div>';
+ return;
+ }
+ let schoolRows = list.filter(function (r) {
+ return (r.school || '').trim().toLowerCase() === mySchool;
+ });
+ if (!schoolRows.some(function (r) { return r.me; })) {
+ schoolRows = schoolRows.concat(ML.Leaderboard.meEntry());
+ }
+ schoolRows.sort(function (a, b) { return b.mr - a.mr; });
+ self._boardRows(schoolRows.slice(0, 10), true);
+ return;
+ }
  let rows = list;
  if (!rows.some(function (r) { return r.me; })) rows = rows.concat(ML.Leaderboard.meEntry());
  rows.sort(function (a, b) { return b.mr - a.mr; });
@@ -5100,7 +5124,13 @@ window.ML_FIREBASE_CONFIG = {
       const st = pf.stats;
 
       el('pf-ava').innerHTML = heroImg(P.heroDef());
-      el('pf-name').innerHTML = esc(pf.name || 'PEMAIN') + ' <button class="mini-btn" data-act="edit-name">✏️</button>';
+       el('pf-name').innerHTML = esc(pf.name || 'PEMAIN') + ' <button class="mini-btn" data-act="edit-name"> </button>';
+ const schoolEl = document.getElementById('pf-school');
+ if (schoolEl) {
+ schoolEl.innerHTML =
+ ' Sekolah: <b>' + (pf.school ? esc(pf.school) : '<i style="color:#94a3b8">Belum diisi</i>') + '</b>' +
+ ' <button class="mini-btn" data-act="edit-school"> Edit</button>';
+ }
       el('pf-level').textContent = 'Level ' + lv.level;
       el('pf-xpfill').style.width = Math.round((lv.cur / lv.need) * 100) + '%';
       el('pf-xptext').textContent = 'XP ' + lv.cur + ' / ' + lv.need + ' (total ' + pf.xp + ')';
@@ -6348,6 +6378,48 @@ setTimeout(function(){
           if (UI.current === 'profile') UI.renderProfile();
         });
         break;
+
+       case 'edit-school': {
+ const self2 = this;
+ const bd2 = UI.modal(
+ '<h3> Nama Sekolah</h3>' +
+ '<p>Isi nama sekolahmu. Nama ini dipakai untuk mengelompokkan pemain di tab Sekolah pada Papan Skor.</p>' +
+ '<input id="school-input" maxlength="40" placeholder="Contoh: SMP Nusantara 1" autocomplete="off" ' +
+ 'value="' + U.esc(P.data.school || '') + '">' +
+ '<div class="m-actions">' +
+ '<button class="btn ghost" data-mact="no">BATAL</button>' +
+ '<button class="btn primary" data-mact="ok">SIMPAN</button>' +
+ '</div>'
+ );
+ const inp2 = bd2.querySelector('#school-input');
+ setTimeout(function () { try { inp2.focus(); inp2.select(); } catch (e) {} }, 60);
+ function saveSchool() {
+ const val = (inp2.value || '').trim();
+ P.data.school = val.slice(0, 40);
+ P.save();
+ UI.closeModal();
+ UI.toast(val ? ' Sekolah disimpan: ' + U.esc(val) : ' Nama sekolah dihapus');
+ if (UI.current === 'profile') UI.renderProfile();
+ // Langsung update skor di Firestore supaya tab Sekolah langsung sinkron.
+ if (ML.Backend && ML.Backend.online && ML.Backend.submitScore) {
+ ML.Backend.submitScore({
+ name: P.data.name || 'PEMAIN',
+ hero: P.data.hero,
+ mr: P.data.mr,
+ level: ML.Rules.levelFromXP(P.data.xp).level,
+ school: P.data.school || ''
+ });
+ }
+ }
+ bd2.addEventListener('click', function (e) {
+ const b2 = e.target.closest('[data-mact]');
+ if (!b2) return;
+ UI.closeModal();
+ if (b2.getAttribute('data-mact') === 'ok') saveSchool();
+ });
+ inp2.addEventListener('keydown', function (e) { if (e.key === 'Enter') saveSchool(); });
+ break;
+ }
 
       case 'link-google':
         (async function () {
