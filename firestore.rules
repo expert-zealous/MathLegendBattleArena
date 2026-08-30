@@ -26,8 +26,7 @@ service cloud.firestore {
     }
     match /rooms/{id} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && request.resource.data.keys().size() <= 30;
+      allow create, update: if request.auth != null;
       allow delete: if request.auth != null;
     }
   }

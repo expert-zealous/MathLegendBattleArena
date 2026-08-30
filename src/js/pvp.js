@@ -498,13 +498,12 @@
         self._slots.e[d].push(self._makeNetQuestion(d));
       });
 
-      // Teruskan seluruh event Battle ke UI Host DAN ke Guest melalui frame Firebase.
-      // Sebelumnya Battle berjalan, tetapi event serangan/jawaban tidak konsisten disalin ke NetBattle.
-      ['question','timer','answered','attack','skill','difficulty'].forEach(function(evName){
-        battle.on(evName, function(data){
-          self.emit(evName, data);
-          if(evName==='timer' || evName==='question') return;
-          self._pendingEvts.push({n:evName,d:JSON.parse(JSON.stringify(data||{}))});
+      // Teruskan SEMUA event engine host ke frame online. Tanpa ini Guest
+      // tidak pernah menerima hasil jawaban/serangan walaupun Host berjalan normal.
+      ['answered','attack','skill'].forEach(function(name){
+        battle.on(name, function(data){
+          const safe = JSON.parse(JSON.stringify(data || {}));
+          self._pendingEvts.push({ n:name, d:safe });
           self._scheduleFlush();
         });
       });
@@ -790,14 +789,11 @@
       st.answered=true;
       if(this._timerIv){clearInterval(this._timerIv);this._timerIv=null;}
       this.emit('answered',{side:'p',correct:ok,grade:grade,timeUsed:Math.round(used*10)/10,answer:String(st.q.choices[st.q.answerIndex]),explanation:'',combo:this.p.combo,energy:this.p.energy,source:'NET',hpP:this.p.hp,hpE:this.e.hp});
-      // Kirim jawaban guest ke host. Jika Firebase gagal, buka kembali soal agar pemain tidak terkunci.
-      const answerPatch={ansE:{by:'guest',qid:st.payload.qid,choice:i,timeUsed:Math.round(used*10)/10}};
-      const self=this;
-      this._write(answerPatch).then(function(ok){
-        if(ok===false){
-          st.answered=false; self._answeredLocal=false; self.p.answered=false;
-          self.emit('neterror',{message:'Jawaban gagal dikirim. Coba lagi.'});
-        }
+      this._write({ansE:{by:'guest',qid:st.payload.qid,choice:i,timeUsed:Math.round(used*10)/10}}).catch((err)=>{
+        // Jangan biarkan Guest macet jika Firestore menolak write.
+        self._answeredLocal=false; st.answered=false;
+        if(G.console) console.error('[ML PVP GUEST ANSWER WRITE]', err && (err.code||err.message)||err);
+        self.emit('neterror',{stage:'answer',error:String(err && (err.code||err.message)||err)});
       });
     }
     chooseDifficulty(diff){
@@ -809,8 +805,12 @@
       if(this._difficultyReqSent)return false;
       this._difficultyReqSent=true;
       const qid='req-'+getUid(this.fb)+'-'+Date.now();
-      this._write({questionReq:{by:'guest',difficulty:d,qid:qid}});
-      setTimeout(()=>{this._difficultyReqSent=false;},350);
+      this._write({questionReq:{by:'guest',difficulty:d,qid:qid}}).catch((err)=>{
+        this._difficultyReqSent=false;
+        if(G.console) console.error('[ML PVP GUEST SKILL WRITE]', err && (err.code||err.message)||err);
+        this.emit('neterror',{stage:'skill',error:String(err && (err.code||err.message)||err)});
+      });
+      setTimeout(()=>{this._difficultyReqSent=false;},700);
       this.emit('difficulty',{difficulty:d,next:true,parallel:true});
       return true;
     }
@@ -836,13 +836,13 @@
     _write(patch) {
       const fs = this.fb.fs;
       try {
-        return fs.setDoc(this.roomRef, patch, { merge: true }).then(function(){ return true; }).catch(function(err){
-          if(G.console) console.error('[ML PVP WRITE]',err && (err.code||err.message)||err, patch);
-          return false;
+        return fs.setDoc(this.roomRef, patch, { merge: true }).catch(function(err){
+          if(G.console) console.error('[ML PVP WRITE]', patch, err && (err.code||err.message)||err);
+          throw err;
         });
       } catch (e) {
-        if(G.console) console.error('[ML PVP WRITE]',e && (e.code||e.message)||e, patch);
-        return Promise.resolve(false);
+        if(G.console) console.error('[ML PVP WRITE]', patch, e && (e.code||e.message)||e);
+        return Promise.reject(e);
       }
     }
     _scheduleFlush() {
