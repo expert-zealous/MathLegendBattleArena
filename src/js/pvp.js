@@ -872,12 +872,64 @@
         this._issueQuestion('e',2);
       }
     }
+    _forceHostRender(before, side){
+      if(this.role!=='host') return;
+      const b=this.battle;
+      if(!b || !G.document) return;
+      const after={hpP:b.p.hp,hpE:b.e.hp,enP:b.p.energy,enE:b.e.energy,cbP:b.p.combo,cbE:b.e.combo,shP:b.p.shield,shE:b.e.shield};
+
+      // Tidak melalui emitter: langsung perbarui HUD DOM Host.
+      const pct=(hp,max)=>Math.max(0,Math.min(100,(Number(hp)||0)/(Number(max)||1)*100))+'%';
+      const byId=(id)=>G.document.getElementById(id);
+      const pf=byId('b-p-hpfill'), ef=byId('b-e-hpfill');
+      const pt=byId('b-p-hptext'), et=byId('b-e-hptext');
+      if(pf) pf.style.width=pct(after.hpP,b.p.maxHp);
+      if(ef) ef.style.width=pct(after.hpE,b.e.maxHp);
+      if(pt) pt.textContent=Math.max(0,after.hpP)+'/'+b.p.maxHp;
+      if(et) et.textContent=Math.max(0,after.hpE)+'/'+b.e.maxHp;
+
+      // Panggil UI normal juga, tetapi DOM di atas tetap menjadi fallback terakhir.
+      const ui=G.ML&&G.ML.UI;
+      if(ui&&typeof ui._onNetState==='function') {
+        try{ ui._onNetState(after); }catch(err){}
+      }
+
+      const changed=before&&(before.hpP!==after.hpP||before.hpE!==after.hpE);
+      if(changed){
+        const from=side==='p'?'p':'e';
+        const to=side==='p'?'e':'p';
+        const atk=byId(from==='p'?'b-hero-p':'b-hero-e');
+        const def=byId(to==='p'?'b-hero-p':'b-hero-e');
+        if(atk){
+          const cls=from==='p'?'atk-p':'atk-e';
+          atk.classList.remove(cls); void atk.offsetWidth; atk.classList.add(cls);
+          const img=atk.querySelector('img');
+          if(img&&img.dataset&&img.dataset.atk){
+            const idle=img.dataset.idle||img.src;
+            img.src=img.dataset.atk;
+            setTimeout(function(){ if(img) img.src=idle; },650);
+          }
+        }
+        if(def){ def.classList.remove('hurt'); void def.offsetWidth; def.classList.add('hurt'); }
+        if(ui&&typeof ui._onAttack==='function'){
+          try{
+            ui._onAttack({from:from,to:to,dmg:Math.max(0,(to==='p'?before.hpP:before.hpE)-(to==='p'?after.hpP:after.hpE)),
+              hpP:after.hpP,hpE:after.hpE,crit:false,meteor:false,heal:0,drain:false,grade:'HIT',tags:[],shield:to==='p'?after.shP:after.shE,forced:true});
+          }catch(err){}
+        }
+      }
+    },
+
     playerAnswer(i){
       if(this.role==='watch'||this.finished||this._answeredLocal||!this.q)return;
       this._answeredLocal=true;
       const st=this._qState.p;if(!st)return;
       if(this.role==='host'){
+        // V20.1: render Host dari titik API yang benar-benar dipanggil UI.
+        // Ini menghindari ketergantungan pada bridge emitter internal.
+        const before={hpP:this.battle.p.hp,hpE:this.battle.e.hp};
         this._answerSide('p',i,(Date.now()-st.startedAt)/1000,st.payload.qid);
+        this._forceHostRender(before,'p');
         return;
       }
       const used=Math.max(0.1,Math.min((Date.now()-st.startedAt)/1000,st.payload.limit||10));
