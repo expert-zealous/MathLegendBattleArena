@@ -512,6 +512,9 @@
           self._hostBridgeCount++;
           if (name === 'attack') self._hostAttackBridgeCount++;
           self.emit(name, safe);
+          if (name==='attack' && self.role==='host' && G.ML && G.ML.UI && G.ML.UI.B && G.ML.UI.B.engine===self) {
+            try { G.ML.UI._onAttack(safe); } catch(err) { if(G.console) console.error('[ML HOST ATTACK UI]',err); }
+          }
           self.emit('state', {
             hpP: battle.p.hp, hpE: battle.e.hp,
             enP: battle.p.energy, enE: battle.e.energy,
@@ -682,18 +685,37 @@
       // Fallback penting: jika engine benar-benar mengubah HP tetapi event attack
       // tidak sampai ke NetBattle/UI Host, bangun event attack lokal dari state.
       // Tidak dikirim ke Firebase sehingga Guest tidak menerima duplikasi.
+      let directAttack = null;
       if (this.role==='host' && (this._hostAttackBridgeCount||0)===attackBridgeBefore &&
           (before.hpP!==after.hpP || before.hpE!==after.hpE)) {
         const from=side==='p'?'p':'e';
         const to=side==='p'?'e':'p';
         const dmg=Math.max(0, (to==='p'?before.hpP:before.hpE) - (to==='p'?after.hpP:after.hpE));
-        this.emit('attack',{
+        directAttack={
           from:from,to:to,dmg:dmg,crit:false,meteor:false,comeback:false,
           heal:0,drain:false,grade:'HIT',
           combo:from==='p'?after.cbP:after.cbE,tags:[],
           hpP:after.hpP,hpE:after.hpE,shield:to==='p'?after.shP:after.shE,
           fallback:true
-        });
+        };
+        this.emit('attack',directAttack);
+      }
+
+      // ROOT FIX V20:
+      // Host tidak lagi hanya bergantung pada emitter NetBattle. Pada beberapa
+      // alur browser, Battle Engine sudah selesai menghitung damage tetapi listener
+      // UI Host tidak menerima event relay. Karena UI dan NetBattle berada pada
+      // halaman yang sama, lakukan sinkronisasi DOM Host langsung sebagai fallback.
+      if (this.role==='host' && G.ML && G.ML.UI && G.ML.UI.B && G.ML.UI.B.engine===this) {
+        try {
+          const ui=G.ML.UI;
+          if (typeof ui._onNetState==='function') ui._onNetState(after);
+          if (directAttack && typeof ui._onAttack==='function') ui._onAttack(directAttack);
+          // Jika bridge attack sebenarnya ada, UI sudah menerima event normal.
+          // State langsung tetap aman karena hanya memperbarui angka HUD.
+        } catch(err) {
+          if (G.console) console.error('[ML HOST DIRECT UI]',err);
+        }
       }
       return true;
     }
