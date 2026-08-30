@@ -3342,7 +3342,7 @@ body {
       bots.push(ML.Leaderboard.meEntry());
 
       bots.sort(function (a, b) { return b.mr - a.mr; });
-      return bots;
+      return bots.slice(0, 10);
     }
   };
 })();
@@ -5067,17 +5067,17 @@ window.ML_FIREBASE_CONFIG = {
       this._boardRows(ML.Leaderboard.get(tab), false);
 
       // ...lalu lengkapi dengan data online bila tersedia
-      if (isOnline && ML.Backend.topScores) {
-        ML.Backend.topScores(50).then(function (list) {
-          if (!list || self.current !== 'leaderboard' || self.boardTab !== tab) return;
-          if (tab === 'friends') return; // tab teman tetap lokal pada fase ini
-          let rows = list;
-          if (tab === 'school') rows = list.filter(function (r) { return r.school; });
-          if (!rows.some(function (r) { return r.me; })) rows = rows.concat(ML.Leaderboard.meEntry());
-          rows.sort(function (a, b) { return b.mr - a.mr; });
-          self._boardRows(rows.slice(0, 50), true);
-        }).catch(function () {});
-      }
+       if (isOnline && ML.Backend.topScores) {
+ ML.Backend.topScores(10).then(function (list) {
+ if (!list || self.current !== 'leaderboard' || self.boardTab !== tab) return;
+ if (tab === 'friends') return; // tab teman: menyusul di tahap berikutnya
+ if (tab === 'school') return; // tab sekolah: menyusul di tahap berikutnya
+ let rows = list;
+ if (!rows.some(function (r) { return r.me; })) rows = rows.concat(ML.Leaderboard.meEntry());
+ rows.sort(function (a, b) { return b.mr - a.mr; });
+ self._boardRows(rows.slice(0, 10), true);
+ }).catch(function () {});
+ }
     },
 
     _boardRows: function (rows, online) {
