@@ -10185,5 +10185,225 @@ body {
   else boot();
 })();
 </script>
+<style id="ml-ui-stage5-3">
+/* ============================================================
+   UI TAHAP 5.3: PILIH HERO & MODE PERTANDINGAN
+   Kode: gpt-5.6-terra-medium
+   ============================================================ */
+
+/* Ubah halaman setup menjadi Flexbox agar urutannya bisa diubah */
+#screen-setup .page {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 1. Header (Paling Atas) */
+#screen-setup .page-head {
+  order: 0;
+}
+
+/* 2. Hero Detail / Showcase (Dinaikkan ke atas) */
+#su-detail {
+  order: 1;
+  margin-top: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+  border-radius: 24px !important;
+  border: 2px solid rgba(255,255,255,.9) !important;
+  background: radial-gradient(ellipse at 50% 0%, rgba(238,242,255,1) 0%, rgba(248,250,252,1) 100%) !important;
+  box-shadow: 0 10px 30px rgba(99,102,241,.12) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background aura di dalam showcase */
+#su-detail::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 30%, rgba(99,102,241,.08), transparent 60%);
+  pointer-events: none;
+}
+
+/* Gambar Hero Besar di dalam detail */
+.showcase-ava {
+  width: 140px; height: 140px;
+  margin: 10px auto 16px;
+  position: relative;
+  z-index: 2;
+}
+.showcase-ava .hero-img {
+  width: 100%; height: 100%; object-fit: contain;
+  filter: drop-shadow(0 14px 20px rgba(15,23,42,.25));
+  animation: floatHero 3s ease-in-out infinite;
+}
+@keyframes floatHero {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* 3. Daftar Hero (Carousel Swipe ke Samping) */
+#screen-setup .hero-cards {
+  order: 2;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 12px !important;
+  padding: 4px 4px 16px 4px !important;
+  margin-bottom: 8px;
+  border-bottom: 2px dashed rgba(226,232,240,.8);
+}
+#screen-setup .hero-cards::-webkit-scrollbar { display: none; } /* Sembunyikan scrollbar */
+#screen-setup .hero-card {
+  flex: 0 0 105px !important;
+  scroll-snap-align: center;
+  border-radius: 20px !important;
+}
+
+/* 4. Gear Summary */
+#su-gear {
+  order: 3;
+  text-align: center;
+}
+
+/* 5. Label AI */
+#screen-setup .page > h3.su-label:nth-of-type(1) {
+  order: 4;
+  margin-top: 16px;
+  font-size: 14px !important;
+  color: #1e293b !important;
+  text-align: center;
+}
+#screen-setup .page > h3.su-label:nth-of-type(1)::before { content: '🤖 '; }
+
+/* 6. Pilihan AI */
+#su-ai {
+  order: 5;
+}
+
+/* 7. Tombol Mulai AI */
+#su-start {
+  order: 6;
+  margin-top: 12px;
+  background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+  box-shadow: 0 6px 20px rgba(79,70,229,.3) !important;
+}
+
+/* 8. Divider Online */
+#su-online {
+  order: 7;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 2px solid #e2e8f0;
+  background: linear-gradient(180deg, rgba(240,253,244,.4), transparent);
+  border-radius: 24px;
+}
+#su-online h3 {
+  font-size: 14px !important;
+  color: #166534 !important;
+  text-align: center;
+  margin-bottom: 12px !important;
+}
+#su-online h3::before { content: '⚡ '; }
+
+/* Tombol Cari Lawan Otomatis diperbesar */
+#su-online .btn.online {
+  font-size: 16px !important;
+  padding: 18px !important;
+  background: linear-gradient(135deg, #059669, #10b981) !important;
+  box-shadow: 0 6px 24px rgba(16,185,129,.4) !important;
+  border: 1px solid rgba(255,255,255,.3) !important;
+  animation: pulseGreen 2s infinite;
+}
+@keyframes pulseGreen {
+  0%, 100% { box-shadow: 0 6px 24px rgba(16,185,129,.4); }
+  50% { box-shadow: 0 6px 30px rgba(16,185,129,.7); }
+}
+
+/* Teks panduan di bawah */
+#screen-setup .page > .page-desc.small {
+  order: 8;
+  margin-top: 16px;
+  text-align: center;
+  opacity: 0.8;
+}
+</style>
+
+<script>
+/* ============================================================
+   JS TAHAP 5.3: Injeksi Gambar Hero Besar ke Setup
+   Kode: gpt-5.6-terra-medium
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function waitReady() {
+    if (!window.ML || !ML.UI || !ML.DATA || !ML.Player) {
+      return setTimeout(waitReady, 60);
+    }
+    installSetupPatch();
+  }
+
+  function installSetupPatch() {
+    if (ML._setupPatch53) return;
+    ML._setupPatch53 = true;
+
+    const UI = ML.UI;
+    const D = ML.DATA;
+    const P = ML.Player;
+
+    // Fungsi pembantu untuk membuat tag img (mirip dengan yang ada di ui.js)
+    function buildHeroBodyHtml(h) {
+      if (!h || !h.imgF) return '';
+      return '<img class="hero-img" src="' + h.imgF + '" data-atk="' + (h.imgA || h.imgF) + '" data-idle="' + h.imgF + '" draggable="false">';
+    }
+
+    // Intercept fungsi renderSetup untuk menyuntikkan gambar besar
+    if (!UI._origRenderSetup53) {
+      UI._origRenderSetup53 = UI.renderSetup.bind(UI);
+    }
+
+    UI.renderSetup = function () {
+      // 1. Jalankan render aslinya dulu
+      UI._origRenderSetup53();
+
+      // 2. Modifikasi hasil render
+      const detail = document.getElementById('su-detail');
+      const st = ML.App.setup;
+      const h = D.heroes.find(function(x){ return x.id === st.heroId; }) || D.heroes[0];
+
+      if (detail && h) {
+        // Hapus emoji dari title karena gambarnya sudah besar
+        const titleEl = detail.querySelector('.hd-title');
+        if (titleEl) {
+          titleEl.innerHTML = '<b style="font-size:16px">' + h.name + '</b><br><span style="font-size:11px;color:#64748b">' + h.title + '</span>';
+        }
+
+        // Tambahkan div gambar besar di paling atas
+        const imgHtml = buildHeroBodyHtml(h) || '<div style="font-size:60px">' + h.emoji + '</div>';
+        detail.insertAdjacentHTML('afterbegin', '<div class="showcase-ava">' + imgHtml + '</div>');
+      }
+
+      // 3. Ubah Teks Tombol Online agar lebih estetik
+      const btnAuto = document.querySelector('[data-act="pvp-search"]');
+      if (btnAuto) btnAuto.innerHTML = '⚡ CARI LAWAN ONLINE';
+
+      const btnCreate = document.querySelector('[data-act="pvp-create"]');
+      if (btnCreate) btnCreate.innerHTML = '🎮 MAIN DENGAN KODE (HOST)';
+
+      const btnJoin = document.querySelector('[data-act="pvp-join"]');
+      if (btnJoin) btnJoin.innerHTML = '🔑 GABUNG ROOM (GUEST)';
+    };
+
+    console.log('[ML] Patch 5.3 Setup UI aktif (gpt-5.6-terra-medium)');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitReady);
+  } else {
+    waitReady();
+  }
+})();
+</script>
 </body>
 </html>
