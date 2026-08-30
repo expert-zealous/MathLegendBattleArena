@@ -5841,6 +5841,127 @@ setTimeout(function(){
     UI.toast('⚔️ Lawan: ' + U.esc(info.opp.name));
   }
 
+   /* ---------- matchmaking otomatis dengan wasit siluman ---------- */
+ function startSilentRefereeMatch(info) {
+ const B = ML.Backend;
+
+ if (!B || !B.online || !B._fb || !B.user) {
+ UI.toast(' Mode online belum tersedia');
+ return;
+ }
+
+ const myLevel = ML.Rules.levelFromXP(P.data.xp).level;
+
+ /* Data pemain pada perangkat ini */
+ const me = {
+ uid: B.user.uid,
+ name: P.data.name || 'PEMAIN',
+ hero: P.data.hero || 'raka',
+ mr: Number(P.data.mr) || 1000,
+ rp: Number(P.data.rp) || 0,
+ level: myLevel,
+ gear: P.computeGear(P.data.hero)
+ };
+
+ /* Data lawan yang diberikan oleh matchmaking */
+ const rawOpp = info.opp || {};
+ const opp = {
+ uid: rawOpp.uid || '',
+ name: rawOpp.name || 'LAWAN',
+ hero: rawOpp.hero || 'raka',
+ mr: Number(rawOpp.mr) || 1000,
+ rp: Number(rawOpp.rp) || 0,
+ level: Number(rawOpp.level) || 1,
+ gear: rawOpp.gear || null
+ };
+
+ /*
+ Pemain pertama dalam antrean sebelumnya mendapat role "host".
+ Sekarang layar pemain pertama diubah menjadi Player A, sedangkan
+ engine host dijalankan oleh wasit siluman.
+ */
+ if (info.role === 'host') {
+ const players = {
+ a: me,
+ b: opp
+ };
+
+ /*
+ Buka layar pemain terlebih dahulu.
+
+ Penting:
+ startNetBattle() memanggil endBattleSilently().
+ Karena itu wasit siluman baru boleh dibuat SETELAH layar Player A
+ selesai dibuat agar tidak ikut dihancurkan.
+ */
+ startNetBattle({
+ role: 'playerA',
+ roomId: info.roomId,
+ opp: opp,
+ players: players
+ });
+
+ /* Wasit tersembunyi; tidak dihubungkan ke UI */
+ const silentReferee = new ML.NetBattle({
+ fb: B._fb,
+ role: 'referee',
+ roomId: info.roomId,
+
+ myHeroId: me.hero,
+ myName: me.name,
+ myGear: me.gear,
+ myLevel: me.level,
+ myRP: me.rp,
+
+ opp: opp,
+ players: players
+ });
+
+ App.silentReferee = silentReferee;
+
+ function clearSilentReferee() {
+ if (App.silentReferee !== silentReferee) return;
+
+ App.silentReferee = null;
+
+ try {
+ silentReferee.destroy();
+ } catch (e) {}
+ }
+
+ /*
+ Beri waktu agar frame hasil akhir selesai ditulis ke Firestore
+ sebelum wasit siluman dihancurkan.
+ */
+ silentReferee.on('end', function () {
+ setTimeout(clearSilentReferee, 3000);
+ });
+
+ silentReferee.on('aborted', function () {
+ clearSilentReferee();
+ });
+
+ silentReferee.start();
+
+ UI.toast(' Lawan ditemukan • Wasit otomatis aktif');
+ return;
+ }
+
+ /*
+ Pemain kedua tetap menggunakan tampilan Guest/Player B.
+ Battle Engine dijalankan wasit siluman pada perangkat pertama.
+ */
+ startNetBattle({
+ role: 'guest',
+ roomId: info.roomId,
+ opp: opp,
+ players: {
+ a: opp,
+ b: me
+ }
+ });
+ }
+
   function startWatch(roomIdRaw) {
     endBattleSilently();
     const roomId = String(roomIdRaw || '').trim();
@@ -5883,6 +6004,17 @@ setTimeout(function(){
   }
 
   function endBattleSilently() {
+    /*
+ Bersihkan wasit otomatis jika pemain keluar dari pertandingan.
+ */
+ if (App.silentReferee) {
+ const silentReferee = App.silentReferee;
+ App.silentReferee = null;
+
+ try {
+ silentReferee.destroy();
+ } catch (e) {}
+ }
     const root0 = document.getElementById('battle-root');
     if (root0) root0.classList.remove('mode-watch');
     if (App.battle) {
@@ -6005,7 +6137,7 @@ setTimeout(function(){
         handle = ML.PVP.findMatch(
           B._fb,
           { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) },
-          function (info) { UI.closeModal(); startNetBattle(info); },
+          function (info) { UI.closeModal(); startSilentRefereeMatch(info); },
           function (err) {
             UI.closeModal();
             UI.toast(err === 'timeout' ? '⌛ Tidak ada lawan ditemukan, coba lagi' : 'ℹ️ Pencarian dibatalkan');
