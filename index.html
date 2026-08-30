@@ -3588,7 +3588,9 @@ window.ML_FIREBASE_CONFIG = {
               hero: v.hero || 'raka',
               mr: Math.max(0, Math.min(9999, Math.round(v.mr))),
               level: v.level || 1,
-              school: !!v.school,
+              uid: d.id,
+school: (v.school || ''),
+friendCode: v.friendCode || '',
               me: d.id === Backend.user.uid
             });
           }
@@ -3597,18 +3599,57 @@ window.ML_FIREBASE_CONFIG = {
       } catch (e) { return null; }
     },
 
+     /* ---------- papan skor sekolah: query langsung by nama sekolah ---------- */
+ schoolScores: async function (schoolName, limit) {
+ if (!this.online || !schoolName) return [];
+ var want = String(schoolName).replace(/\s+/g, ' ').trim().toUpperCase();
+ if (!want) return [];
+ try {
+ var fb = this._fb;
+ var self = this;
+ var q = fb.fs.query(
+ fb.fs.collection(fb.db, 'leaderboard'),
+ fb.fs.where('school', '==', want),
+ fb.fs.limit(30)
+ );
+ var snap = await fb.fs.getDocs(q);
+ var out = [];
+ snap.forEach(function (d) {
+ var v = d.data() || {};
+ if (typeof v.mr !== 'number') return;
+ out.push({
+ uid: d.id,
+ name: String(v.name || 'TANPA NAMA').slice(0, 12),
+ hero: v.hero || 'raka',
+ mr: Math.max(0, Math.min(9999, Math.round(v.mr))),
+ level: v.level || 1,
+ school: v.school || '',
+ friendCode: v.friendCode || '',
+ me: d.id === (self.user && self.user.uid)
+ });
+ });
+ out.sort(function (a, b) { return b.mr - a.mr; });
+ return out.slice(0, limit || 10);
+ } catch (e) {
+ this._lastError = (e && e.message) || '';
+ if (window.console) console.warn('[ML schoolScores]', this._lastError, e);
+ return null;
+ }
+ },
+
     /* dipanggil main.js setelah tiap match selesai */
      onMatchEnd: function (profile) {
  if (!this.online) return;
  const R = ML.Rules;
  this.saveProfile(profile);
  this.submitScore({
- name: profile.name || 'PEMAIN',
- hero: profile.hero,
- mr: profile.mr,
- level: R.levelFromXP(profile.xp).level,
- school: profile.school || ''
- });
+  name: profile.name || 'PEMAIN',
+  hero: profile.hero,
+  mr: profile.mr,
+  level: R.levelFromXP(profile.xp).level,
+  school: String(profile.school || '').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 30),
+  friendCode: profile.friendCode || ''
+});
  }
   });
 })();
@@ -6791,6 +6832,310 @@ setTimeout(function(){
   }
 })();
 
+</script>
+<script>
+/* ============================================================
+   PATCH 4.3B — Papan Skor Sekolah Firebase
+   Fungsi:
+   - Tab SEKOLAH tidak lagi memakai bot lokal
+   - Filter sekolah langsung dari Firestore
+   - Maksimal tampil 10 pemain
+   - Sekolah dikirim ulang saat disimpan dan setelah match selesai
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function waitReady() {
+    if (!window.ML || !ML.UI || !ML.Player || !ML.Backend || !ML.Rules || !ML.DATA) {
+      return setTimeout(waitReady, 60);
+    }
+    installSchoolPatch();
+  }
+
+  function installSchoolPatch() {
+    if (ML._schoolPatch43B) return;
+    ML._schoolPatch43B = true;
+
+    const UI = ML.UI;
+    const P = ML.Player;
+    const B = ML.Backend;
+    const U = ML.util;
+    const D = ML.DATA;
+    const R = ML.Rules;
+
+    function el(id) {
+      return document.getElementById(id);
+    }
+
+    function cleanSchool(s) {
+      return String(s || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase()
+        .slice(0, 30);
+    }
+
+    function heroSmall(heroId) {
+      const h = D.heroes.find(function (x) { return x.id === heroId; }) || D.heroes[0];
+      if (h && h.img) {
+        return '<img class="hero-img" src="' + h.img + '" alt="' + U.esc(h.name) + '" draggable="false">';
+      }
+      return h ? h.emoji : '';
+    }
+
+    function drawRows(rows, online) {
+      const box = el('board-list');
+      if (!box) return;
+
+      box.innerHTML = rows.map(function (r, i) {
+        return '<div class="board-row' + (r.me ? ' me' : '') + '">' +
+          '<span class="b-rank">' + (i + 1) + '</span>' +
+          '<span class="b-ava">' + heroSmall(r.hero) + '</span>' +
+          '<span class="b-name">' +
+            (r.me ? '⭐ ' : '') + U.esc(r.name || 'PEMAIN') +
+            '<small>Lv ' + (r.level || 1) + (online ? ' • online' : '') + '</small>' +
+          '</span>' +
+          '<span class="b-mr">' + Math.round(r.mr || 0) + ' MR</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    function myEntryWithSchool() {
+      return {
+        uid: B.user && B.user.uid ? B.user.uid : '',
+        name: P.data.name || 'PEMAIN',
+        hero: P.data.hero || 'raka',
+        mr: Number(P.data.mr) || 1000,
+        level: R.levelFromXP(P.data.xp).level,
+        school: cleanSchool(P.data.school),
+        friendCode: P.data.friendCode || '',
+        me: true
+      };
+    }
+
+    /* ---------- Pastikan score yang dikirim ke Firebase selalu membawa school ---------- */
+    function submitMySchoolScore() {
+      if (!B || !B.online || !B.submitScore) return Promise.resolve(false);
+
+      const school = cleanSchool(P.data.school);
+      return B.submitScore({
+        name: P.data.name || 'PEMAIN',
+        hero: P.data.hero || 'raka',
+        mr: Number(P.data.mr) || 1000,
+        level: R.levelFromXP(P.data.xp).level,
+        school: school,
+        friendCode: P.data.friendCode || ''
+      });
+    }
+
+    /* ---------- Patch onMatchEnd agar setiap selesai match update school juga ---------- */
+    if (B.onMatchEnd && !B._origOnMatchEnd43B) {
+      B._origOnMatchEnd43B = B.onMatchEnd.bind(B);
+      B.onMatchEnd = function (profile) {
+        const ret = B._origOnMatchEnd43B(profile);
+
+        try {
+          if (this.online && this.submitScore) {
+            this.submitScore({
+              name: profile.name || 'PEMAIN',
+              hero: profile.hero || 'raka',
+              mr: Number(profile.mr) || 1000,
+              level: R.levelFromXP(profile.xp).level,
+              school: cleanSchool(profile.school),
+              friendCode: profile.friendCode || ''
+            });
+          }
+        } catch (e) {}
+
+        return ret;
+      };
+    }
+
+    /* ---------- Fungsi query sekolah langsung ke Firestore ---------- */
+    B.schoolScores = async function (schoolName, limit) {
+      const want = cleanSchool(schoolName);
+      if (!this.online || !this._fb || !want) return [];
+
+      try {
+        const fb = this._fb;
+
+        /*
+          Tidak pakai orderBy agar tidak butuh composite index.
+          Baca maksimal 30 data sekolah, lalu sorting MR di client.
+        */
+        const q = fb.fs.query(
+          fb.fs.collection(fb.db, 'leaderboard'),
+          fb.fs.where('school', '==', want),
+          fb.fs.limit(30)
+        );
+
+        const snap = await fb.fs.getDocs(q);
+        const out = [];
+        const selfUid = this.user && this.user.uid;
+
+        snap.forEach(function (docSnap) {
+          const v = docSnap.data() || {};
+          if (typeof v.mr !== 'number') return;
+
+          out.push({
+            uid: docSnap.id,
+            name: String(v.name || 'TANPA NAMA').slice(0, 12),
+            hero: v.hero || 'raka',
+            mr: Math.max(0, Math.min(9999, Math.round(v.mr))),
+            level: v.level || 1,
+            school: cleanSchool(v.school),
+            friendCode: v.friendCode || '',
+            me: docSnap.id === selfUid
+          });
+        });
+
+        out.sort(function (a, b) { return b.mr - a.mr; });
+        return out.slice(0, limit || 10);
+      } catch (e) {
+        this._lastError = String((e && (e.code || e.message)) || e);
+        console.warn('[ML schoolScores]', this._lastError, e);
+        return null;
+      }
+    };
+
+    /* ---------- Override hanya tab SEKOLAH. Tab GLOBAL/TEMAN tetap pakai kode lama. ---------- */
+    if (!UI._origRenderBoard43B) {
+      UI._origRenderBoard43B = UI.renderBoard.bind(UI);
+    }
+
+    UI.renderBoard = function () {
+      const tab = this.boardTab;
+
+      /*
+        Selain tab sekolah, gunakan renderBoard lama agar fitur global/teman
+        dari revisi sebelumnya tidak rusak.
+      */
+      if (tab !== 'school') {
+        return UI._origRenderBoard43B();
+      }
+
+      const box = el('board-list');
+      if (!box) return;
+
+      document.querySelectorAll('#board-tabs .tab').forEach(function (t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+      });
+
+      const note = el('board-note');
+      if (note) note.textContent = 'Papan sekolah memakai data online berdasarkan nama sekolah yang sama.';
+
+      const mySchool = cleanSchool(P.data.school);
+
+      if (!mySchool) {
+        box.innerHTML =
+          '<p class="page-desc small">Kamu belum mengisi nama sekolah.<br>' +
+          'Buka <b>PROFIL</b> lalu isi nama sekolah.</p>' +
+          '<button class="btn ghost wide" data-act="edit-school" style="margin-top:8px">✏️ ISI NAMA SEKOLAH</button>';
+        return;
+      }
+
+      if (!B.online) {
+        box.innerHTML =
+          '<p class="page-desc small">Tab SEKOLAH membutuhkan mode online.<br>' +
+          'Saat ini Firebase belum aktif/terhubung.</p>';
+        return;
+      }
+
+      box.innerHTML = '<p class="page-desc small">🏫 ' + U.esc(mySchool) + ' — memuat data online…</p>';
+
+      B.schoolScores(mySchool, 10).then(function (list) {
+        if (UI.current !== 'leaderboard' || UI.boardTab !== 'school') return;
+
+        if (list === null) {
+          box.innerHTML =
+            '<p class="page-desc small">⚠️ Gagal memuat papan sekolah.<br>' +
+            'Buka Console/F12 lalu cari pesan <b>[ML schoolScores]</b>.</p>';
+          return;
+        }
+
+        let rows = list.slice();
+
+        /*
+          Jika data saya belum muncul di Firebase, tampilkan sementara dari data lokal.
+          Tapi tetap coba kirim ke server.
+        */
+        if (!rows.some(function (r) { return r.me; })) {
+          rows.push(myEntryWithSchool());
+          rows.sort(function (a, b) { return b.mr - a.mr; });
+          submitMySchoolScore().catch(function () {});
+        }
+
+        rows = rows.slice(0, 10);
+
+        if (!rows.length) {
+          box.innerHTML =
+            '<p class="page-desc small">🏫 ' + U.esc(mySchool) + '<br>' +
+            'Belum ada pemain dari sekolah ini.</p>';
+          return;
+        }
+
+        box.innerHTML =
+          '<p class="page-desc small" style="margin-bottom:6px">🏫 ' +
+          U.esc(mySchool) + ' • menampilkan ' + rows.length + ' besar</p>';
+
+        drawRows(rows, true);
+      }).catch(function (err) {
+        console.warn('[ML school render]', err);
+        box.innerHTML = '<p class="page-desc small">⚠️ Gagal memuat data sekolah</p>';
+      });
+    };
+
+    /* ---------- Tangkap tombol edit-school agar langsung kirim sekolah ke Firebase ---------- */
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-act="edit-school"]');
+      if (!btn) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const currentSchool = cleanSchool(P.data.school);
+
+      UI.inputModal(
+        '🏫 Nama Sekolah',
+        'Masukkan nama sekolah. Pemain dengan nama yang sama akan muncul di tab SEKOLAH.',
+        currentSchool || 'Contoh: SMPN 1 BANDUNG',
+        'SIMPAN',
+        function (val) {
+          const cleaned = cleanSchool(val);
+
+          if (!cleaned) {
+            UI.toast('Nama sekolah tidak boleh kosong');
+            return;
+          }
+
+          P.data.school = cleaned;
+          P.save();
+
+          UI.toast('🏫 Disimpan: ' + cleaned);
+
+          submitMySchoolScore().then(function () {
+            UI.toast('✅ Sekolah terkirim ke server');
+            if (UI.current === 'profile') UI.renderProfile();
+            if (UI.current === 'leaderboard') UI.renderBoard();
+          }).catch(function (err) {
+            console.warn('[ML submit school]', err);
+            UI.toast('⚠️ Gagal kirim sekolah ke server');
+            if (UI.current === 'profile') UI.renderProfile();
+            if (UI.current === 'leaderboard') UI.renderBoard();
+          });
+        }
+      );
+    }, true);
+
+    console.log('[ML] Patch 4.3B papan sekolah aktif');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitReady);
+  } else {
+    waitReady();
+  }
+})();
 </script>
 </body>
 </html>
