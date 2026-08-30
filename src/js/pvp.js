@@ -503,6 +503,14 @@
       ['answered','attack','skill'].forEach(function(name){
         battle.on(name, function(data){
           const safe = JSON.parse(JSON.stringify(data || {}));
+
+          // PENTING: Host juga harus menerima event Battle secara lokal.
+          // Sebelumnya event hanya dikirim ke frame Firebase untuk Guest,
+          // sehingga audio dari engine terdengar tetapi UI Host (HP/pose/hasil)
+          // tidak pernah menerima event tersebut.
+          self.emit(name, safe);
+
+          // Setelah UI Host menerima event, event yang sama dikirim ke Guest.
           self._pendingEvts.push({ n:name, d:safe });
           self._scheduleFlush();
         });
