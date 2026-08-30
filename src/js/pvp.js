@@ -469,34 +469,15 @@
       return ML.DATA.heroes.find(function (h) { return h.id === id; }) || ML.DATA.heroes[0];
     }
 
-    // Satu pipeline render untuk semua klien. State engine tetap milik Host,
-    // tetapi tampilan Host, Guest, dan Wasit selalu diputar dari frame yang sama.
-    _renderFrame(frame, remap) {
-      if (!frame) return;
-      const f = frame;
-      const state = remap ? {
-        hpP:f.hpE, hpE:f.hpP, enP:f.enE, enE:f.enP,
-        cbP:f.cbE, cbE:f.cbP, shP:f.shE, shE:f.shP
-      } : {
-        hpP:f.hpP, hpE:f.hpE, enP:f.enP, enE:f.enE,
-        cbP:f.cbP, cbE:f.cbE, shP:f.shP, shE:f.shE
-      };
-
-      // Sinkronkan objek yang dipakai UI agar fallback HP selalu konsisten.
-      if (this.p && Number.isFinite(Number(state.hpP))) {
-        this.p.hp=Number(state.hpP); this.p.energy=Number(state.enP)||0;
-        this.p.combo=Number(state.cbP)||0; this.p.shield=Number(state.shP)||0;
+    // V22: untuk Host, event visual berasal LANGSUNG dari Battle engine yang
+    // memang menghitung damage. Ini membuat UI Host memakai jalur event yang sama
+    // seperti mode AI, sementara NetBattle tetap menangani room/Firebase/soal.
+    on(ev, fn) {
+      if (this.role === 'host' && this.battle &&
+          (ev === 'answered' || ev === 'attack' || ev === 'skill' || ev === 'end')) {
+        return this.battle.on(ev, fn);
       }
-      if (this.e && Number.isFinite(Number(state.hpE))) {
-        this.e.hp=Number(state.hpE); this.e.energy=Number(state.enE)||0;
-        this.e.combo=Number(state.cbE)||0; this.e.shield=Number(state.shE)||0;
-      }
-
-      this.emit('state',state);
-      (f.evts||[]).forEach((ev)=>{
-        const data=remap ? remapSides(ev.d) : ev.d;
-        this.emit(ev.n,data);
-      });
+      return super.on(ev, fn);
     }
 
     /* ---------- HOST: PvP bebas giliran (soal independen per pemain) ---------- */
@@ -531,32 +512,11 @@
         self._slots.e[d].push(self._makeNetQuestion(d));
       });
 
-      // Teruskan SEMUA event engine host ke frame online. Tanpa ini Guest
-      // tidak pernah menerima hasil jawaban/serangan walaupun Host berjalan normal.
+      // Event engine asli dikirim ke Firebase untuk Guest.
+      // UI Host berlangganan langsung ke engine melalui on() override V22.
       ['answered','attack','skill'].forEach(function(name){
         battle.on(name, function(data){
           const safe = JSON.parse(JSON.stringify(data || {}));
-
-          // Host harus menerima event Battle secara lokal DAN state terbaru.
-          // State dipancarkan terpisah agar HUD Host tidak hanya bergantung
-          // pada frame Firebase yang memang ditujukan untuk perangkat lain.
-          self._hostBridgeCount++;
-          if (name === 'attack') self._hostAttackBridgeCount++;
-          self.emit(name, safe);
-          self.emit('state', {
-            hpP: battle.p.hp, hpE: battle.e.hp,
-            enP: battle.p.energy, enE: battle.e.energy,
-            cbP: battle.p.combo, cbE: battle.e.combo,
-            shP: battle.p.shield, shE: battle.e.shield
-          });
-
-          // Replay event sekali pada tick berikutnya. Ini memastikan UI yang
-          // dipasang sesudah inisialisasi NetBattle tetap menerima event lokal.
-          setTimeout(function () {
-            if (!self.finished) self.emit(name, safe);
-          }, 0);
-
-          // Event yang sama tetap dikirim ke Firebase untuk Guest.
           self._pendingEvts.push({ n:name, d:safe });
           self._scheduleFlush();
         });
@@ -582,10 +542,26 @@
         self._watchStale('guestAlive', d);
         if (d.surrender) { battle._finish('p','SURRENDER'); return; }
 
-        // Host memakai pipeline render yang SAMA persis dengan Guest.
+        // ROOT FIX V20.2:
+        // Guest sudah merender dari Firebase frame. Host sebelumnya TIDAK pernah
+        // memutar ulang frame miliknya sendiri, sehingga engine/audio berjalan
+        // tetapi HUD dan pose Host tidak mengikuti jalur render yang sama.
+        // Host sekarang memakai pipeline render yang SAMA seperti Guest.
         if (d.frame && d.frame.seq && d.frame.seq > self._lastHostFrameSeq) {
           self._lastHostFrameSeq=d.frame.seq;
-          self._renderFrame(d.frame,false);
+
+          // Jangan menulis balik state ke engine; engine Host adalah sumber otoritatif.
+          // Frame hanya menjadi sumber render UI yang identik dengan Guest.
+          const frameState={
+            hpP:d.frame.hpP, hpE:d.frame.hpE,
+            enP:d.frame.enP, enE:d.frame.enE,
+            cbP:d.frame.cbP, cbE:d.frame.cbE,
+            shP:d.frame.shP, shE:d.frame.shE
+          };
+          self.emit('state',frameState);
+          (d.frame.evts||[]).forEach(function(ev){
+            self.emit(ev.n,ev.d);
+          });
         }
 
         // Guest answers its own independent question (side e on host engine).
@@ -695,11 +671,62 @@
       const b=this.battle;
       b.q=st.q; b.qLimit=st.payload.limit; b.qStart=st.startedAt;
 
-      // Host adalah engine otoritatif. UI tidak dirender dari sini;
-      // render dilakukan melalui frame yang sama dengan Guest.
-      b.netAnswer(side,index,Math.max(0,Math.min(Number(timeUsed)||st.payload.limit,st.payload.limit)));
-      this._flushNow();
+      // Simpan state sebelum engine berjalan. Ini dipakai sebagai fallback
+      // bila bridge event Battle -> NetBattle gagal pada sisi Host.
+      const before = {
+        hpP:b.p.hp, hpE:b.e.hp,
+        enP:b.p.energy, enE:b.e.energy,
+        cbP:b.p.combo, cbE:b.e.combo,
+        shP:b.p.shield, shE:b.e.shield
+      };
+      const attackBridgeBefore=this._hostAttackBridgeCount||0;
 
+      b.netAnswer(side,index,Math.max(0,Math.min(Number(timeUsed)||st.payload.limit,st.payload.limit)));
+
+      // HUD Host selalu menerima state final, tanpa menunggu Firebase.
+      const after = {
+        hpP:b.p.hp, hpE:b.e.hp,
+        enP:b.p.energy, enE:b.e.energy,
+        cbP:b.p.combo, cbE:b.e.combo,
+        shP:b.p.shield, shE:b.e.shield
+      };
+      this.emit('state', after);
+
+      // Fallback penting: jika engine benar-benar mengubah HP tetapi event attack
+      // tidak sampai ke NetBattle/UI Host, bangun event attack lokal dari state.
+      // Tidak dikirim ke Firebase sehingga Guest tidak menerima duplikasi.
+      let directAttack = null;
+      if (this.role==='host' && (this._hostAttackBridgeCount||0)===attackBridgeBefore &&
+          (before.hpP!==after.hpP || before.hpE!==after.hpE)) {
+        const from=side==='p'?'p':'e';
+        const to=side==='p'?'e':'p';
+        const dmg=Math.max(0, (to==='p'?before.hpP:before.hpE) - (to==='p'?after.hpP:after.hpE));
+        directAttack={
+          from:from,to:to,dmg:dmg,crit:false,meteor:false,comeback:false,
+          heal:0,drain:false,grade:'HIT',
+          combo:from==='p'?after.cbP:after.cbE,tags:[],
+          hpP:after.hpP,hpE:after.hpE,shield:to==='p'?after.shP:after.shE,
+          fallback:true
+        };
+        this.emit('attack',directAttack);
+      }
+
+      // ROOT FIX V20:
+      // Host tidak lagi hanya bergantung pada emitter NetBattle. Pada beberapa
+      // alur browser, Battle Engine sudah selesai menghitung damage tetapi listener
+      // UI Host tidak menerima event relay. Karena UI dan NetBattle berada pada
+      // halaman yang sama, lakukan sinkronisasi DOM Host langsung sebagai fallback.
+      if (this.role==='host' && G.ML && G.ML.UI && G.ML.UI.B && G.ML.UI.B.engine===this) {
+        try {
+          const ui=G.ML.UI;
+          if (typeof ui._onNetState==='function') ui._onNetState(after);
+          if (directAttack && typeof ui._onAttack==='function') ui._onAttack(directAttack);
+          // Jika bridge attack sebenarnya ada, UI sudah menerima event normal.
+          // State langsung tetap aman karena hanya memperbarui angka HUD.
+        } catch(err) {
+          if (G.console) console.error('[ML HOST DIRECT UI]',err);
+        }
+      }
       return true;
     }
 
@@ -735,9 +762,9 @@
         }
         if(d.frame && d.frame.seq && d.frame.seq>self._lastFrameSeq){
           self._lastFrameSeq=d.frame.seq;
-          self._renderFrame(d.frame,true);
-          self.p.empowered=d.frame.empE||null;
-          self.e.empowered=d.frame.empP||null;
+          self.e.hp=d.frame.hpP; self.e.energy=d.frame.enP; self.e.combo=d.frame.cbP; self.e.shield=d.frame.shP; self.e.empowered=d.frame.empP||null;
+          self.p.hp=d.frame.hpE; self.p.energy=d.frame.enE; self.p.combo=d.frame.cbE; self.p.shield=d.frame.shE; self.p.empowered=d.frame.empE||null;
+          (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,remapSides(ev.d)); });
         }
         if(d.status==='done'&&d.result&&!self.finished){
           self.finished=true; if(self._timerIv){clearInterval(self._timerIv);self._timerIv=null;}
@@ -855,7 +882,7 @@
         this._issueQuestion('e',2);
       }
     }
-    _forceHostRender(){ /* legacy V20 renderer disabled: canonical frame renderer is used */ }
+    _forceHostRender(){ /* V22 legacy renderer disabled */ }
 
     playerAnswer(i){
       if(this.role==='watch'||this.finished||this._answeredLocal||!this.q)return;
@@ -948,14 +975,8 @@
         shP:b.p.shield, shE:b.e.shield,
         empP:b.p.empowered || null, empE:b.e.empowered || null
       };
-
-      // Host memutar frame yang sama secara lokal SEKARANG.
-      // Jadi tidak bergantung pada onSnapshot perangkat sendiri.
-      if(this.role==='host'){
-        this._lastHostFrameSeq=frame.seq;
-        this._renderFrame(frame,false);
-      }
-
+      // State tetap dipancarkan untuk HUD yang membutuhkan angka terbaru.
+      if(this.role==='host') this.emit('state',frame);
       this._write({seq:now,frame:frame});
     }
     _watchStale(field, d) {
