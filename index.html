@@ -6125,26 +6125,159 @@ setTimeout(function(){
         break;
       }
 
-      case 'pvp-search': {
-        const B = ML.Backend;
-        if (!B || !B.online || !B._fb || !B.user) {
-          UI.toast('ℹ️ Mode online belum aktif — cek README-FIREBASE.md');
-          break;
-        }
-        AU.play('skill');
-        let handle = null;
-        UI.searchingModal(function () { if (handle) handle.cancel(); });
-        handle = ML.PVP.findMatch(
-          B._fb,
-          { name: P.data.name || 'PEMAIN', hero: P.data.hero, mr: P.data.mr, level: ML.Rules.levelFromXP(P.data.xp).level, gear: P.computeGear(P.data.hero) },
-          function (info) { UI.closeModal(); startSilentRefereeMatch(info); },
-          function (err) {
-            UI.closeModal();
-            UI.toast(err === 'timeout' ? '⌛ Tidak ada lawan ditemukan, coba lagi' : 'ℹ️ Pencarian dibatalkan');
-          }
-        );
-        break;
-      }
+       case 'pvp-search': {
+ const B = ML.Backend;
+
+ if (!B || !B.online || !B._fb || !B.user) {
+ UI.toast(' Mode online belum aktif — cek README-FIREBASE.md');
+ break;
+ }
+
+ AU.play('skill');
+
+ const fs = B._fb.fs, db = B._fb.db, uid = B.user.uid;
+ const lobbyRef = fs.doc(db, 'rooms', 'auto-lobby');
+
+ const me = {
+ name: P.data.name || 'PEMAIN',
+ hero: P.data.hero,
+ mr: P.data.mr,
+ level: ML.Rules.levelFromXP(P.data.xp).level,
+ gear: P.computeGear(P.data.hero)
+ };
+
+ let cancelled = false;
+ let handle = null;
+ let heartbeat = null;
+ let myCode = null;
+
+ // Bersihkan slot papan tunggu jika miliknya sendiri.
+ const releaseSlot = function () {
+ fs.runTransaction(db, async function (tx) {
+ const snap = await tx.get(lobbyRef);
+ const cur = snap.exists() ? (snap.data().current || null) : null;
+ if (cur && cur.uid === uid) {
+ tx.set(lobbyRef, { current: null, updatedAt: Date.now() }, { merge: true });
+ }
+ }).catch(function () {});
+ };
+
+ // Tombol Batal.
+ UI.searchingModal(function () {
+ cancelled = true;
+ if (handle) { try { handle.cancel(); } catch (e) {} handle = null; }
+ if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
+ releaseSlot();
+ });
+
+ // Fase 1: cek papan tunggu dengan transaksi (anti-tabrakan).
+ fs.runTransaction(db, async function (tx) {
+ const snap = await tx.get(lobbyRef);
+ const data = snap.exists() ? (snap.data() || {}) : {};
+ const cur = data.current || null;
+ const stale = cur && (Date.now() - (cur.at || 0) > 45000);
+
+ if (cur && !stale && cur.uid === uid) {
+ // Perangkat lain dengan akun sama sedang menunggu.
+ return { role: 'self' };
+ }
+
+ if (cur && !stale) {
+ // Ada lawan menunggu, ambil kodenya lalu kosongkan papan.
+ tx.set(lobbyRef, { current: null, updatedAt: Date.now() }, { merge: true });
+ return { role: 'join', code: cur.code };
+ }
+
+ // Belum ada / basi: jadi penunggu, tetapi jangan tulis papan dulu.
+ return { role: 'wait' };
+ }).then(function (result) {
+ if (cancelled) return;
+
+ // Perangkat sendiri.
+ if (result.role === 'self') {
+ UI.closeModal();
+ UI.toast(' Akun ini sudah mencari lawan di perangkat lain');
+ return;
+ }
+
+ // Sebagai pemain kedua: langsung gabung.
+ if (result.role === 'join') {
+ UI.setModalStatus(' Lawan ditemukan, menghubungkan…');
+ handle = ML.PVP.joinRoom(B._fb, me, result.code,
+ function (info) {
+ if (cancelled) return;
+ UI.closeModal();
+ startNetBattle(info);
+ },
+ function (err) {
+ if (cancelled) return;
+ UI.closeModal();
+ const msg = String(err || '');
+ UI.toast(' Gagal terhubung: ' + msg.slice(0, 80));
+ },
+ function () {}
+ );
+ return;
+ }
+
+ // Sebagai pemain pertama: buat ruangan dulu, baru daftarkan ke papan.
+ myCode = ML.PVP.makeCode();
+ UI.setModalStatus(' Menyiapkan ruangan…');
+
+ handle = ML.PVP.createRoom(B._fb, me, myCode,
+ function (info) {
+ if (cancelled) return;
+ if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
+ fs.setDoc(lobbyRef, { current: null, updatedAt: Date.now() }, { merge: true }).catch(function () {});
+ UI.closeModal();
+ startNetBattle(info);
+ },
+ function (err) {
+ if (cancelled) return;
+ if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
+ releaseSlot();
+ UI.closeModal();
+ const msg = String(err || '');
+ if (msg === 'cancel') UI.toast(' Pencarian dibatalkan');
+ else if (msg === 'timeout') UI.toast(' Tidak ada lawan yang bergabung');
+ else UI.toast(' Pencarian gagal: ' + msg.slice(0, 80));
+ },
+ function (status) {
+ if (cancelled) return;
+
+ if (status === 'waiting') {
+ // Ruangan sudah pasti ada. Aman untuk didaftarkan ke papan tunggu.
+ UI.setModalStatus(' Menunggu lawan…');
+
+ fs.setDoc(lobbyRef, {
+ current: { uid: uid, code: myCode, at: Date.now(), name: me.name },
+ updatedAt: Date.now()
+ }, { merge: true }).catch(function () {});
+
+ // Detak agar slot dianggap masih hidup.
+ if (!heartbeat) {
+ heartbeat = setInterval(function () {
+ fs.setDoc(lobbyRef, {
+ current: { uid: uid, code: myCode, at: Date.now(), name: me.name },
+ updatedAt: Date.now()
+ }, { merge: true }).catch(function () {});
+ }, 8000);
+ }
+ }
+
+ if (status === 'starting') {
+ UI.setModalStatus(' Lawan ditemukan, memulai…');
+ }
+ }
+ );
+ }).catch(function (e) {
+ if (cancelled) return;
+ UI.closeModal();
+ UI.toast(' Pencarian gagal: ' + String((e && (e.code || e.message)) || e).slice(0, 80));
+ });
+
+ break;
+ }
 
       case 'answer': {
         const battle = App.battle;
