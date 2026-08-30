@@ -60,6 +60,7 @@
       myName: P.data.name || 'PEMAIN',
       myGear: P.computeGear(P.data.hero),
       myLevel: ML.Rules.levelFromXP(P.data.xp).level,
+      myRP: P.data.rp || 0,
       opp: info.opp,
       players: info.players || null
     });
@@ -72,7 +73,41 @@
         AU.musicStop();
         const a=(info.players&&info.players.a)||{};
         const b=(info.players&&info.players.b)||{};
-        const winner=res.win ? (a.name||'Player A') : (res.draw ? 'SERI' : (b.name||'Player B'));
+        const R=ML.Rules;
+        const battle=net.battle;
+        const winnerSide=res.win?'p':(res.draw?null:'e');
+        const resA=res;
+        const resB=battle ? battle.resultFor('e',winnerSide,res.reason) : null;
+
+        function calcPlayer(player,result,opp){
+          const rpBefore=Number(player.rp)||0;
+          const mrBefore=Number(player.mr)||1000;
+          const rpDelta=R.rpDelta(Object.assign({},result,{online:true,ranked:true}));
+          const mrDelta=R.elo(mrBefore,Number(opp.mr)||1000,result.win?1:(result.draw?0.5:0));
+          const rpAfter=Math.max(0,Math.min(ML.DATA.RP_MAX,rpBefore+rpDelta));
+          return {
+            rpDelta:rpDelta,mrDelta:mrDelta,mrBefore:mrBefore,mrAfter:Math.max(100,mrBefore+mrDelta),
+            rankBefore:R.rankFromRP(rpBefore),rankAfter:R.rankFromRP(rpAfter),
+            result:result
+          };
+        }
+        const ca=calcPlayer(a,resA,b);
+        const cb=calcPlayer(b,resB||Object.assign({},resA,{win:!resA.win,draw:resA.draw}),a);
+        const winner=res.draw?'SERI':(res.win?(a.name||'Player A'):(b.name||'Player B'));
+
+        function sign(n){return n>0?'+'+n:String(n);}
+        function statBlock(label,c){
+          const r=c.result;
+          const rankMove=c.rankAfter.index>c.rankBefore.index?'⬆️ NAIK':(c.rankAfter.index<c.rankBefore.index?'⬇️ TURUN':'➡️ TETAP');
+          return '<div style="text-align:left;padding:10px 8px;border-top:1px solid rgba(255,255,255,.12)">'+
+            '<b>'+U.esc(label)+'</b>'+
+            '<div style="margin-top:6px;font-size:13px">📈 Rating: <b>'+c.mrBefore+' → '+c.mrAfter+' ('+sign(c.mrDelta)+')</b></div>'+
+            '<div style="margin-top:3px;font-size:13px">🏅 Rank: '+c.rankBefore.icon+' '+U.esc(c.rankBefore.name)+' → '+c.rankAfter.icon+' '+U.esc(c.rankAfter.name)+' <b>'+rankMove+'</b></div>'+
+            '<div style="margin-top:3px;font-size:13px">🎯 Benar: '+(r.correct||0)+'/'+(r.questions||0)+' · Akurasi: '+Math.round((r.accuracy||0)*100)+'% · 🔥 Combo: '+(r.maxCombo||0)+'</div>'+
+            '<div style="margin-top:3px;font-size:13px">💥 Damage: '+Math.round(r.dmgDealt||0)+' · ⭐ Perfect: '+(r.perfect||0)+' · ⏱️ Rata-rata: '+Number(r.avgTime||0).toFixed(1)+' dtk</div>'+
+          '</div>';
+        }
+
         setTimeout(function(){
           UI.detachBattle();
           net.destroy();
@@ -80,14 +115,14 @@
           UI.show('home');
           UI.modal(
             '<h3>🏁 HASIL PERTANDINGAN</h3>'+
-            '<p style="text-align:center;font-size:18px;margin:8px 0 14px"><b>'+
-            U.esc(a.name||'PLAYER A')+' vs '+U.esc(b.name||'PLAYER B')+'</b></p>'+
+            '<p style="text-align:center;font-size:18px;margin:8px 0 14px"><b>'+U.esc(a.name||'PLAYER A')+' vs '+U.esc(b.name||'PLAYER B')+'</b></p>'+
             '<div class="result-score" style="text-align:center;padding:12px 8px;margin-bottom:12px">'+
             '<div style="font-size:13px;opacity:.75">PEMENANG</div>'+
             '<div style="font-size:24px;font-weight:900;margin-top:5px">'+(res.draw?'🤝 SERI':'🏆 '+U.esc(winner))+'</div>'+
             '</div>'+
-            '<p style="text-align:center;margin:6px 0">❤️ '+U.esc(a.name||'Player A')+': <b>'+Math.max(0,Math.round(net.p&&net.p.hp||0))+'</b> HP</p>'+
-            '<p style="text-align:center;margin:6px 0 16px">❤️ '+U.esc(b.name||'Player B')+': <b>'+Math.max(0,Math.round(net.e&&net.e.hp||0))+'</b> HP</p>'+
+            '<div style="font-size:14px;font-weight:800;margin:4px 0 4px">📊 RATING, RANK & STATISTIK</div>'+
+            statBlock(a.name||'PLAYER A',ca)+
+            statBlock(b.name||'PLAYER B',cb)+
             '<div class="m-actions"><button class="btn primary" data-ref-result="close">SELESAI</button></div>'
           );
           const modalRoot=document.getElementById('modal-root');

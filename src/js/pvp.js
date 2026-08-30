@@ -397,7 +397,7 @@
     const c=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
     if(!fs||!db||!uid||!c){onFail&&onFail('invalid-code');return {cancel:function(){}};}
     const ref=fs.doc(db,'rooms',c); let unsub=null, done=false, slot=null;
-    const mine=_clean({uid:uid,name:(me.name||'PEMAIN').slice(0,12),hero:me.hero||'raka',mr:isFinite(me.mr)?me.mr:1000,level:me.level||1,gear:me.gear||null});
+    const mine=_clean({uid:uid,name:(me.name||'PEMAIN').slice(0,12),hero:me.hero||'raka',mr:isFinite(me.mr)?me.mr:1000,rp:isFinite(me.rp)?me.rp:0,level:me.level||1,gear:me.gear||null});
     fs.runTransaction(db,async function(tx){
       const snap=await tx.get(ref);
       if(!snap.exists())throw new Error('NOT_FOUND');
