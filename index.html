@@ -981,6 +981,43 @@ body {
 .account-actions .wide{margin:0!important}
 .account-state{margin-bottom:14px}
 
+
+/* ================= V19.1 PREMIUM BUTTON & MENU UI ================= */
+:root{--ui-gold:#ffd54a;--ui-ink:#10162b;--ui-glow:rgba(255,213,74,.34)}
+button{font-family:inherit}
+.btn,.tile,.skill-btn,.diff-skill,.ava-btn,.back,.btn-quit{
+  -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+}
+.btn{
+  position:relative; isolation:isolate; overflow:hidden;
+  border:1px solid rgba(255,255,255,.34)!important;
+  border-bottom-width:4px!important;
+  box-shadow:0 8px 0 rgba(15,23,42,.20),0 12px 28px rgba(15,23,42,.22),inset 0 1px 0 rgba(255,255,255,.45)!important;
+  letter-spacing:.35px; font-weight:900!important; transition:transform .14s ease,filter .14s ease,box-shadow .14s ease;
+}
+.btn::after{content:"";position:absolute;z-index:-1;left:-20%;right:-20%;top:-70%;height:95%;background:linear-gradient(180deg,rgba(255,255,255,.38),transparent);transform:rotate(-8deg);pointer-events:none}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.btn:active{transform:translateY(4px) scale(.985)!important;box-shadow:0 3px 0 rgba(15,23,42,.18),0 6px 14px rgba(15,23,42,.18)!important}
+.btn.primary,.btn.big.primary{background:linear-gradient(180deg,#ffda54 0%,#f59e0b 52%,#d97706 100%)!important;color:#2a1600!important;text-shadow:0 1px rgba(255,255,255,.38);box-shadow:0 8px 0 #a85c00,0 0 22px var(--ui-glow),inset 0 1px 0 rgba(255,255,255,.7)!important}
+.btn.online{background:linear-gradient(180deg,#34d399,#059669 58%,#047857)!important;box-shadow:0 8px 0 #065f46,0 0 20px rgba(52,211,153,.24),inset 0 1px 0 rgba(255,255,255,.5)!important}
+.btn.ghost{background:linear-gradient(180deg,#ffffff,#eef2ff)!important;color:#24305e!important;border-color:#b8c4ff!important;box-shadow:0 7px 0 #c7d2fe,0 10px 20px rgba(49,46,129,.12)!important}
+.btn.danger{box-shadow:0 8px 0 #b91c1c,0 10px 24px rgba(239,68,68,.22)!important}
+.tile{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.72)!important;border-bottom:4px solid rgba(30,41,59,.16)!important;border-radius:20px!important;background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(241,245,249,.96))!important;box-shadow:0 8px 18px rgba(15,23,42,.12),inset 0 1px 0 #fff!important;transition:transform .16s ease,box-shadow .16s ease!important}
+.tile::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,213,74,.18),transparent 45%);pointer-events:none}
+.tile:hover{transform:translateY(-4px) scale(1.015);box-shadow:0 13px 24px rgba(15,23,42,.17)!important}
+.tile:active{transform:translateY(2px) scale(.985)}
+.tile b{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(180deg,#fff7d1,#fde68a);box-shadow:0 4px 0 #f2c94c,0 7px 14px rgba(245,158,11,.18);margin-bottom:5px}
+.ava-btn{border:2px solid var(--ui-gold)!important;background:radial-gradient(circle at 35% 30%,#fff8d5,#f59e0b)!important;box-shadow:0 0 0 3px rgba(255,213,74,.17),0 6px 15px rgba(245,158,11,.26)!important;transition:transform .15s ease!important}.ava-btn:active{transform:scale(.92)}
+.back,.btn-quit{border:1px solid rgba(255,255,255,.55)!important;background:linear-gradient(180deg,#334155,#0f172a)!important;box-shadow:0 5px 0 #020617,0 8px 16px rgba(15,23,42,.25)!important}.back:active,.btn-quit:active{transform:translateY(3px)}
+.diff-skill,.skill-btn{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.36)!important;border-bottom:4px solid rgba(15,23,42,.25)!important;box-shadow:0 7px 0 rgba(15,23,42,.22),0 10px 20px rgba(15,23,42,.22),inset 0 1px 0 rgba(255,255,255,.36)!important;transition:transform .13s ease,filter .13s ease!important}
+.diff-skill:hover,.skill-btn:hover{transform:translateY(-2px);filter:brightness(1.08)}.diff-skill:active,.skill-btn:active{transform:translateY(4px) scale(.97)!important;box-shadow:0 3px 0 rgba(15,23,42,.2)!important}
+.diff-skill b,.skill-btn b{letter-spacing:.7px}.diff-skill span{font-size:.78em;opacity:.88;font-weight:800}
+.diff-skill.easy{background:linear-gradient(180deg,#4ade80,#16a34a)!important}.diff-skill.medium{background:linear-gradient(180deg,#facc15,#f59e0b)!important}.diff-skill.hard{background:linear-gradient(180deg,#fb7185,#e11d48)!important}
+.link-btn{font-weight:800!important;letter-spacing:.2px;text-decoration:none!important;border-bottom:1px dashed currentColor}
+/* account/profile action spacing and polish */
+.account-actions,.profile-actions,.cloud-actions{display:flex;flex-direction:column;gap:14px}.account-actions .btn,.profile-actions .btn,.cloud-actions .btn{margin:0!important}
+@media (max-width:600px){.btn.big{min-height:58px;font-size:17px!important}.tile{border-radius:17px!important}.tile b{width:36px;height:36px;border-radius:12px}.diff-skill,.skill-btn{min-height:52px}}
+
 </style>
 </head>
 <body>
