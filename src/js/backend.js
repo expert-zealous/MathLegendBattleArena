@@ -58,6 +58,22 @@
 
     isLinked: function () { return !!(this.online && this.user && this.user.linked); },
 
+    friendlyAuthError: function (e) {
+      const code = (e && e.code) || '';
+      const msg = (e && e.message) || '';
+      const map = {
+        'auth/operation-not-allowed':'Login Google belum diaktifkan di Firebase Authentication.',
+        'auth/unauthorized-domain':'Domain aplikasi belum diizinkan di Firebase Authentication.',
+        'auth/popup-blocked':'Popup Google diblokir browser. Izinkan popup lalu coba lagi.',
+        'auth/popup-closed-by-user':'Jendela login Google ditutup sebelum selesai.',
+        'auth/account-exists-with-different-credential':'Akun ini sudah memakai metode login lain.',
+        'auth/credential-already-in-use':'Akun Google ini sudah tertaut pada pemain lain.',
+        'permission-denied':'Firestore menolak akses. Firestore Rules perlu diperiksa.'
+      };
+      return map[code] || (code ? code + ': ' + msg : msg || 'Terjadi kesalahan Firebase');
+    },
+
+
     /* Tautkan akun Google ke pemain saat ini. UID anonim dipertahankan,
        sehingga progres lokal/cloud langsung menjadi milik akun permanen. */
     linkGoogle: async function () {

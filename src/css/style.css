@@ -960,3 +960,8 @@ body {
   .skill-btn { order:2; }
   .skill-hint { order:3; width:100%; }
 }
+
+/* V18.1 Account UI spacing */
+.account-actions{display:flex;flex-direction:column;gap:12px;margin-top:14px;width:100%}
+.account-actions .wide{margin:0!important}
+.account-state{margin-bottom:14px}

@@ -447,7 +447,7 @@
       if (acct) {
         acct.innerHTML = linked
           ? '<div class="account-state ok">☁️ <b>AKUN DITAUTKAN</b><br><small>Progres tersimpan ke Cloud dan dapat dipulihkan di perangkat lain.</small></div><button class="btn primary wide" data-act="sync-cloud">☁️ SINKRONKAN SEKARANG</button>'
-          : '<div class="account-state warn">🔒 <b>PROGRES BELUM DIAMANKAN</b><br><small>Tautkan akun untuk menyimpan Level, Hero, atribut, Coin, Diamond, EXP, dan Rank.</small></div><button class="btn online wide" data-act="link-google">🔗 TAUTKAN AKUN & SIMPAN PROGRES</button><button class="btn primary wide" data-act="restore-google">☁️ MASUK & PULIHKAN PROGRES</button>';
+          : '<div class="account-state warn">🔒 <b>PROGRES BELUM DIAMANKAN</b><br><small>Tautkan akun untuk menyimpan Level, Hero, atribut, Coin, Diamond, EXP, dan Rank.</small></div><div class="account-actions"><button class="btn online wide" data-act="link-google">🔗 TAUTKAN AKUN & SIMPAN PROGRES</button><button class="btn primary wide" data-act="restore-google">☁️ MASUK & PULIHKAN PROGRES</button></div>';
       }
 
       el('pf-sound').innerHTML = AU.enabled ? '🔊 EFEK SUARA: ON' : '🔇 EFEK SUARA: OFF';

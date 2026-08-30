@@ -334,7 +334,8 @@
             UI.renderProfile();
             UI.toast('🎉 Akun berhasil ditautkan! Progres Anda sudah diamankan.', true);
           } catch (e) {
-            const msg = (e && (e.message || e.code)) || 'Gagal menautkan akun';
+            const msg = (ML.Backend && ML.Backend.friendlyAuthError) ? ML.Backend.friendlyAuthError(e) : ((e && (e.message || e.code)) || 'Gagal menautkan akun');
+            console.error('[ML ACCOUNT LINK]', e);
             UI.toast('⚠️ ' + msg, false);
           }
         })();
@@ -359,7 +360,9 @@
             UI.renderHome();
             UI.toast('☁️ Progres berhasil dipulihkan!', true);
           } catch (e) {
-            UI.toast('⚠️ Pemulihan gagal: ' + ((e && (e.message || e.code)) || 'coba lagi'), false);
+            console.error('[ML ACCOUNT RESTORE]', e);
+            const msg = (ML.Backend && ML.Backend.friendlyAuthError) ? ML.Backend.friendlyAuthError(e) : ((e && (e.message || e.code)) || 'coba lagi');
+            UI.toast('⚠️ Pemulihan gagal: ' + msg, false);
           }
         })();
         break;

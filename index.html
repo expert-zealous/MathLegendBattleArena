@@ -975,6 +975,12 @@ body {
   .skill-hint { order:3; width:100%; }
 }
 
+
+/* V18.1 Account UI spacing */
+.account-actions{display:flex;flex-direction:column;gap:12px;margin-top:14px;width:100%}
+.account-actions .wide{margin:0!important}
+.account-state{margin-bottom:14px}
+
 </style>
 </head>
 <body>
@@ -4726,7 +4732,7 @@ window.ML_FIREBASE_CONFIG = {
       if (acct) {
         acct.innerHTML = linked
           ? '<div class="account-state ok">☁️ <b>AKUN DITAUTKAN</b><br><small>Progres tersimpan ke Cloud dan dapat dipulihkan di perangkat lain.</small></div><button class="btn primary wide" data-act="sync-cloud">☁️ SINKRONKAN SEKARANG</button>'
-          : '<div class="account-state warn">🔒 <b>PROGRES BELUM DIAMANKAN</b><br><small>Tautkan akun untuk menyimpan Level, Hero, atribut, Coin, Diamond, EXP, dan Rank.</small></div><button class="btn online wide" data-act="link-google">🔗 TAUTKAN AKUN & SIMPAN PROGRES</button><button class="btn primary wide" data-act="restore-google">☁️ MASUK & PULIHKAN PROGRES</button>';
+          : '<div class="account-state warn">🔒 <b>PROGRES BELUM DIAMANKAN</b><br><small>Tautkan akun untuk menyimpan Level, Hero, atribut, Coin, Diamond, EXP, dan Rank.</small></div><div class="account-actions"><button class="btn online wide" data-act="link-google">🔗 TAUTKAN AKUN & SIMPAN PROGRES</button><button class="btn primary wide" data-act="restore-google">☁️ MASUK & PULIHKAN PROGRES</button></div>';
       }
 
       el('pf-sound').innerHTML = AU.enabled ? '🔊 EFEK SUARA: ON' : '🔇 EFEK SUARA: OFF';
@@ -5562,7 +5568,8 @@ window.ML_FIREBASE_CONFIG = {
             UI.renderProfile();
             UI.toast('🎉 Akun berhasil ditautkan! Progres Anda sudah diamankan.', true);
           } catch (e) {
-            const msg = (e && (e.message || e.code)) || 'Gagal menautkan akun';
+            const msg = (ML.Backend && ML.Backend.friendlyAuthError) ? ML.Backend.friendlyAuthError(e) : ((e && (e.message || e.code)) || 'Gagal menautkan akun');
+            console.error('[ML ACCOUNT LINK]', e);
             UI.toast('⚠️ ' + msg, false);
           }
         })();
@@ -5587,7 +5594,9 @@ window.ML_FIREBASE_CONFIG = {
             UI.renderHome();
             UI.toast('☁️ Progres berhasil dipulihkan!', true);
           } catch (e) {
-            UI.toast('⚠️ Pemulihan gagal: ' + ((e && (e.message || e.code)) || 'coba lagi'), false);
+            console.error('[ML ACCOUNT RESTORE]', e);
+            const msg = (ML.Backend && ML.Backend.friendlyAuthError) ? ML.Backend.friendlyAuthError(e) : ((e && (e.message || e.code)) || 'coba lagi');
+            UI.toast('⚠️ Pemulihan gagal: ' + msg, false);
           }
         })();
         break;
