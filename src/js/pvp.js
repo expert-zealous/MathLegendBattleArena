@@ -469,16 +469,7 @@
       return ML.DATA.heroes.find(function (h) { return h.id === id; }) || ML.DATA.heroes[0];
     }
 
-    // V22: untuk Host, event visual berasal LANGSUNG dari Battle engine yang
-    // memang menghitung damage. Ini membuat UI Host memakai jalur event yang sama
-    // seperti mode AI, sementara NetBattle tetap menangani room/Firebase/soal.
-    on(ev, fn) {
-      if (this.role === 'host' && this.battle &&
-          (ev === 'answered' || ev === 'attack' || ev === 'skill' || ev === 'end')) {
-        return this.battle.on(ev, fn);
-      }
-      return super.on(ev, fn);
-    }
+
 
     /* ---------- HOST: PvP bebas giliran (soal independen per pemain) ---------- */
     _initHost() {
@@ -617,7 +608,9 @@
       this._qState[side]={payload:payload, q:q, answered:false, startedAt:Date.now()};
       if(side==='p'){
         this.p.answered=false;
-        this.q=q; this._answeredLocal=false; this._qRecvAt=Date.now(); this.qLimit=payload.limit;
+        this.q=q; this._answeredLocal=false; this.qLimit=payload.limit;
+        // Mirror question into real Battle because Host UI V23 attaches there.
+        if(this.battle){ this.battle.q=q; this.battle.qLimit=payload.limit; }
         this.emit('question',{q:q,round:seq,maxRounds:999,limit:payload.limit,pEnergy:this.p.energy,eEnergy:this.e.energy,parallel:true,side:'p',qid:payload.qid});
         this._startLocalTimer('p',payload.limit);
         this._write({qP:payload, ansE:null});
@@ -889,8 +882,10 @@
       this._answeredLocal=true;
       const st=this._qState.p;if(!st)return;
       if(this.role==='host'){
-        this._answerSide('p',i,(Date.now()-st.startedAt)/1000,st.payload.qid);
-        return;
+        const ok=this._answerSide('p',i,(Date.now()-st.startedAt)/1000,st.payload.qid);
+        // _answeredLocal hanya mencegah double-click pada soal aktif.
+        // Soal berikutnya akan dibuat oleh _issueQuestion dan harus aktif lagi.
+        return ok;
       }
       const used=Math.max(0.1,Math.min((Date.now()-st.startedAt)/1000,st.payload.limit||10));
       const ok=i===st.payload.answerIndex;
