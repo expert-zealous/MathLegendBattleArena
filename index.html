@@ -10405,5 +10405,403 @@ body {
   }
 })();
 </script>
+<style id="ml-ui-stage3-referee">
+/* ============================================================
+   UI TAHAP 3 — SPECTATOR WASIT LAPTOP / PROYEKTOR
+   Aktif hanya pada battle.mode-watch
+   Tanpa soal, tanpa jawaban, tanpa skill
+   ============================================================ */
+
+/* Aktif hanya saat mode wasit */
+#screen-battle .battle.mode-watch {
+  max-width: 1400px !important;
+  width: 100%;
+  padding:
+    calc(10px + env(safe-area-inset-top))
+    18px
+    calc(10px + env(safe-area-inset-bottom)) !important;
+  gap: 12px !important;
+  background:
+    radial-gradient(ellipse 40% 30% at 50% 14%, rgba(99,102,241,.16), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 50% 100%, rgba(15,23,42,.10), transparent 70%),
+    linear-gradient(180deg, #edf2ff 0%, #f5f3ff 55%, #fff7ed 100%);
+}
+
+/* Sembunyikan semua panel soal & kontrol */
+#screen-battle .battle.mode-watch .qpanel,
+#screen-battle .battle.mode-watch .answers,
+#screen-battle .battle.mode-watch .skillbar,
+#screen-battle .battle.mode-watch #skill-hint,
+#screen-battle .battle.mode-watch .q-feedback,
+#screen-battle .battle.mode-watch #b-quit,
+#screen-battle .battle.mode-watch .btn-quit {
+  display: none !important;
+}
+
+/* Top HUD besar dan simetris */
+#screen-battle .battle.mode-watch .b-top {
+  display: grid !important;
+  grid-template-columns: 1fr 110px 1fr !important;
+  gap: 16px !important;
+  align-items: center !important;
+  padding: 14px 18px !important;
+  border-radius: 24px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.82)) !important;
+  border: 1px solid rgba(255,255,255,.95) !important;
+  box-shadow:
+    0 10px 28px rgba(99,102,241,.12),
+    inset 0 1px 0 rgba(255,255,255,.95) !important;
+}
+
+/* Fighter kiri/kanan */
+#screen-battle .battle.mode-watch .fighter {
+  gap: 12px !important;
+}
+
+#screen-battle .battle.mode-watch .fighter.foe {
+  flex-direction: row-reverse !important;
+}
+
+#screen-battle .battle.mode-watch .f-ava {
+  width: 68px !important;
+  height: 68px !important;
+  border-width: 4px !important;
+  box-shadow: 0 6px 16px rgba(15,23,42,.14);
+}
+
+#screen-battle .battle.mode-watch .f-name {
+  font-size: 22px !important;
+  font-weight: 1000 !important;
+  letter-spacing: 1px !important;
+}
+
+#screen-battle .battle.mode-watch .fighter.foe .f-name {
+  text-align: right !important;
+}
+
+#screen-battle .battle.mode-watch .hpbar {
+  height: 22px !important;
+  border-radius: 99px !important;
+  border: 3px solid #fff !important;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.14) !important;
+}
+
+#screen-battle .battle.mode-watch .hpfill.p {
+  background: linear-gradient(90deg, #38bdf8, #2563eb, #1d4ed8) !important;
+}
+
+#screen-battle .battle.mode-watch .hpfill.e {
+  background: linear-gradient(90deg, #fb7185, #e11d48, #be123c) !important;
+}
+
+#screen-battle .battle.mode-watch .hptext {
+  font-size: 13px !important;
+  letter-spacing: .5px !important;
+  font-weight: 1000 !important;
+}
+
+#screen-battle .battle.mode-watch .f-row {
+  gap: 10px !important;
+  min-height: 22px !important;
+}
+
+#screen-battle .battle.mode-watch .energy {
+  gap: 3px !important;
+}
+
+#screen-battle .battle.mode-watch .pip {
+  width: 11px !important;
+  height: 16px !important;
+  border-radius: 4px !important;
+}
+
+#screen-battle .battle.mode-watch .pip.on {
+  box-shadow: 0 0 10px rgba(245,158,11,.55);
+}
+
+#screen-battle .battle.mode-watch .shield-tag {
+  font-size: 12px !important;
+  padding: 2px 8px !important;
+  border-radius: 10px !important;
+}
+
+#screen-battle .battle.mode-watch .combo-badge {
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+}
+
+#screen-battle .battle.mode-watch .f-status {
+  font-size: 12px !important;
+  min-height: 16px !important;
+  text-align: right !important;
+  color: #475569 !important;
+}
+
+/* VS tengah */
+#screen-battle .battle.mode-watch .vs-box {
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+#screen-battle .battle.mode-watch .vs {
+  font-size: 32px !important;
+  font-weight: 1000 !important;
+  letter-spacing: 2px !important;
+  filter: drop-shadow(0 2px 8px rgba(239,68,68,.18));
+}
+
+#screen-battle .battle.mode-watch .round {
+  font-size: 13px !important;
+  font-weight: 1000 !important;
+}
+
+#screen-battle .battle.mode-watch .b-code {
+  display: inline-block !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  color: #6366f1 !important;
+  background: #eef2ff !important;
+  border: 1px solid #c7d2fe !important;
+  padding: 3px 10px !important;
+  border-radius: 999px !important;
+}
+
+/* Live badge */
+#screen-battle .battle.mode-watch .live-badge {
+  top: calc(10px + env(safe-area-inset-top)) !important;
+  right: 18px !important;
+  font-size: 12px !important;
+  padding: 6px 14px !important;
+  border-radius: 999px !important;
+  box-shadow: 0 6px 16px rgba(220,38,38,.34);
+}
+
+/* Arena jauh lebih besar */
+#screen-battle .battle.mode-watch .arena {
+  flex: 1 !important;
+  min-height: 420px !important;
+  max-height: none !important;
+  height: calc(100vh - 170px) !important;
+  border-radius: 28px !important;
+  background:
+    radial-gradient(55% 90% at 20% 78%, rgba(37,99,235,.17), transparent 72%),
+    radial-gradient(55% 90% at 80% 78%, rgba(225,29,72,.15), transparent 72%),
+    radial-gradient(50% 35% at 50% 100%, rgba(251,191,36,.18), transparent 75%),
+    linear-gradient(180deg, #ffffff 0%, #eef2ff 65%, #e0e7ff 100%) !important;
+  border: 1px solid rgba(255,255,255,.95) !important;
+  box-shadow:
+    0 16px 40px rgba(99,102,241,.16),
+    inset 0 -24px 34px rgba(15,23,42,.06) !important;
+  overflow: hidden !important;
+}
+
+#screen-battle .battle.mode-watch .arena::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 18px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(15,23,42,.18), transparent 72%);
+  pointer-events: none;
+}
+
+#screen-battle .battle.mode-watch .hero-fig {
+  width: clamp(170px, 18vw, 250px) !important;
+  top: 54% !important;
+}
+
+#screen-battle .battle.mode-watch .hero-fig.p {
+  left: 11% !important;
+}
+
+#screen-battle .battle.mode-watch .hero-fig.e {
+  right: 11% !important;
+}
+
+#screen-battle .battle.mode-watch .hero-fig .hero-img {
+  filter:
+    drop-shadow(0 14px 20px rgba(15,23,42,.18))
+    drop-shadow(0 24px 36px rgba(99,102,241,.10)) !important;
+}
+
+/* Combo float lebih besar */
+#screen-battle .battle.mode-watch .combo-float {
+  width: 180px !important;
+  min-height: 28px !important;
+  font-size: 13px !important;
+  top: 16px !important;
+  padding: 6px 10px !important;
+  border-radius: 16px !important;
+}
+
+#screen-battle .battle.mode-watch .combo-float.p {
+  left: calc(11% + 95px - 90px) !important;
+}
+
+#screen-battle .battle.mode-watch .combo-float.e {
+  right: calc(11% + 95px - 90px) !important;
+}
+
+/* Damage lebih besar agar enak ditonton dari jauh */
+#screen-battle .battle.mode-watch .dmg {
+  font-size: 42px !important;
+  top: 24% !important;
+  text-shadow: 0 3px 0 #fff, 0 8px 14px rgba(0,0,0,.24) !important;
+}
+
+#screen-battle .battle.mode-watch .dmg.crit {
+  font-size: 52px !important;
+}
+
+#screen-battle .battle.mode-watch .dmg.heal {
+  font-size: 28px !important;
+}
+
+#screen-battle .battle.mode-watch .tag-line {
+  top: 10% !important;
+  font-size: 16px !important;
+  padding: 6px 14px !important;
+  border-radius: 999px !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.10);
+}
+
+/* Sedikit perbesar slash / projectile */
+#screen-battle .battle.mode-watch .fx-slash {
+  width: 120px !important;
+  height: 12px !important;
+}
+
+#screen-battle .battle.mode-watch .fx-proj.fire {
+  box-shadow: 0 0 22px 8px rgba(249,115,22,.55) !important;
+}
+
+#screen-battle .battle.mode-watch .fx-proj.orb {
+  box-shadow: 0 0 22px 8px rgba(16,185,129,.45) !important;
+}
+
+/* Status bawah arena (pseudo footer spectator) */
+#screen-battle .battle.mode-watch::after {
+  content: 'MODE WASIT • LIVE BATTLE • TANPA SOAL PEMAIN';
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #64748b;
+  padding-bottom: 2px;
+}
+
+/* Responsif untuk laptop 13–14 inci */
+@media (max-width: 1280px) {
+  #screen-battle .battle.mode-watch .f-name {
+    font-size: 18px !important;
+  }
+
+  #screen-battle .battle.mode-watch .f-ava {
+    width: 58px !important;
+    height: 58px !important;
+  }
+
+  #screen-battle .battle.mode-watch .arena {
+    min-height: 340px !important;
+    height: calc(100vh - 160px) !important;
+  }
+
+  #screen-battle .battle.mode-watch .hero-fig {
+    width: clamp(140px, 16vw, 210px) !important;
+  }
+
+  #screen-battle .battle.mode-watch .dmg {
+    font-size: 34px !important;
+  }
+
+  #screen-battle .battle.mode-watch .dmg.crit {
+    font-size: 44px !important;
+  }
+}
+
+/* Jika kebetulan layar portrait tablet/laptop, tetap rapi */
+@media (orientation: portrait) and (min-width: 760px) {
+  #screen-battle .battle.mode-watch .b-top {
+    grid-template-columns: 1fr 80px 1fr !important;
+  }
+
+  #screen-battle .battle.mode-watch .arena {
+    height: 52vh !important;
+    min-height: 300px !important;
+  }
+
+  #screen-battle .battle.mode-watch .hero-fig {
+    width: clamp(120px, 20vw, 180px) !important;
+  }
+}
+</style>
+
+<script>
+/* ============================================================
+   UI Tahap 3 — Spectator Wasit Laptop
+   Tambah status visual dan pastikan mode-watch bersih
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function waitReady() {
+    if (!window.ML || !ML.UI) return setTimeout(waitReady, 60);
+    installRefereeStage3();
+  }
+
+  function installRefereeStage3() {
+    if (ML._uiStage3Referee) return;
+    ML._uiStage3Referee = true;
+
+    const UI = ML.UI;
+    const _attach = UI.attachBattle ? UI.attachBattle.bind(UI) : null;
+    if (!_attach) return;
+
+    UI.attachBattle = function (engine) {
+      _attach(engine);
+
+      const root = document.getElementById('battle-root');
+      if (!root || !engine) return;
+
+      const isWatch = engine.role === 'watch' || engine.role === 'referee';
+      if (!isWatch) return;
+
+      root.classList.add('mode-watch');
+
+      /* Pastikan elemen yang tidak relevan untuk wasit benar-benar kosong */
+      const qText = document.getElementById('q-text');
+      const qFeed = document.getElementById('q-feedback');
+      if (qText) qText.textContent = '';
+      if (qFeed) qFeed.textContent = '';
+
+      /* Ubah label nama agar lebih jelas untuk penonton */
+      const pName = document.getElementById('b-p-name');
+      const eName = document.getElementById('b-e-name');
+      if (pName && !/^PLAYER A/i.test(pName.textContent)) {
+        pName.textContent = pName.textContent || 'PLAYER A';
+      }
+      if (eName && !/^PLAYER B/i.test(eName.textContent)) {
+        eName.textContent = eName.textContent || 'PLAYER B';
+      }
+
+      const round = document.getElementById('b-round');
+      if (round && !round.textContent) {
+        round.textContent = 'LIVE';
+      }
+    };
+
+    console.log('[ML] UI Tahap 3 Spectator Wasit aktif');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitReady);
+  } else {
+    waitReady();
+  }
+})();
+</script>
 </body>
 </html>
