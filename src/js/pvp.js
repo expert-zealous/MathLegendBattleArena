@@ -490,6 +490,7 @@
       this._processedAns = {e:null};
       this._timerP = null; this._timerE = null;
       this._lastHostAction = 0;
+      this._lastHostFrameSeq = 0;
 
       const self = this;
       this._hostBridgeCount = 0;
@@ -553,6 +554,28 @@
         const d=snap.data()||{};
         self._watchStale('guestAlive', d);
         if (d.surrender) { battle._finish('p','SURRENDER'); return; }
+
+        // ROOT FIX V20.2:
+        // Guest sudah merender dari Firebase frame. Host sebelumnya TIDAK pernah
+        // memutar ulang frame miliknya sendiri, sehingga engine/audio berjalan
+        // tetapi HUD dan pose Host tidak mengikuti jalur render yang sama.
+        // Host sekarang memakai pipeline render yang SAMA seperti Guest.
+        if (d.frame && d.frame.seq && d.frame.seq > self._lastHostFrameSeq) {
+          self._lastHostFrameSeq=d.frame.seq;
+
+          // Jangan menulis balik state ke engine; engine Host adalah sumber otoritatif.
+          // Frame hanya menjadi sumber render UI yang identik dengan Guest.
+          const frameState={
+            hpP:d.frame.hpP, hpE:d.frame.hpE,
+            enP:d.frame.enP, enE:d.frame.enE,
+            cbP:d.frame.cbP, cbE:d.frame.cbE,
+            shP:d.frame.shP, shE:d.frame.shE
+          };
+          self.emit('state',frameState);
+          (d.frame.evts||[]).forEach(function(ev){
+            self.emit(ev.n,ev.d);
+          });
+        }
 
         // Guest answers its own independent question (side e on host engine).
         const ans=d.ansE;
@@ -1000,7 +1023,9 @@
       self._flushT = setTimeout(function () { self._flushT = null; self._flushNow(); }, 220);
     }
     _flushNow() {
-      if (!this._pendingEvts.length) return;
+      // Frame adalah sumber render bersama untuk Guest, Wasit, dan sekarang Host.
+      // Tetap kirim state meskipun antrean event kosong.
+      if (!this.battle) return;
       const evts = this._pendingEvts;
       this._pendingEvts = [];
       const b = this.battle;
