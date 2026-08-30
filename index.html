@@ -1177,7 +1177,7 @@ body {
       </div>
 
       <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.8.4 offline</span></div>
-      <button class="link-btn" data-act="watch">📺 Mode Wasit (tonton turnamen)</button>
+      <button class="link-btn" data-act="watch"> Mode Wasit (buat room / tonton)</button>
     </div>
   </section>
 
@@ -6189,12 +6189,115 @@ setTimeout(function(){
       }
 
       case 'watch': {
-        const B2 = ML.Backend;
-        if (!B2 || !B2.online || !B2._fb || !B2.user) { UI.toast('ℹ️ Mode wasit butuh mode online'); break; }
-        AU.play('click');
-        UI.watchModal(function (roomId) { startWatch(roomId); });
-        break;
-      }
+ const B2 = ML.Backend;
+
+ if (!B2 || !B2.online || !B2._fb || !B2.user) {
+   UI.toast(' Mode wasit membutuhkan koneksi online Firebase');
+   break;
+ }
+
+ AU.play('click');
+
+ // Menu baru Mode Wasit dari halaman Home.
+ const bd = UI.modal(
+   '<h3> Mode Wasit</h3>' +
+   '<p>Pilih fungsi yang ingin digunakan.</p>' +
+   '<div class="account-actions">' +
+
+     '<button class="btn primary wide" data-wm="create">' +
+       ' BUAT ID ROOM &amp; JADI WASIT' +
+     '</button>' +
+
+     '<button class="btn ghost wide" data-wm="watch">' +
+       ' TONTON ROOM DENGAN KODE' +
+     '</button>' +
+
+     '<button class="btn ghost wide" data-wm="cancel">' +
+       ' BATAL' +
+     '</button>' +
+
+   '</div>'
+ );
+
+ bd.addEventListener('click', function (e) {
+   const button = e.target.closest('[data-wm]');
+   if (!button) return;
+
+   const mode = button.getAttribute('data-wm');
+
+   // Tutup menu pilihan terlebih dahulu.
+   UI.closeModal();
+
+   if (mode === 'cancel') {
+     return;
+   }
+
+   // Pilihan kedua: menonton room yang sudah dibuat.
+   if (mode === 'watch') {
+     UI.watchModal(function (roomId) {
+       startWatch(roomId);
+     });
+     return;
+   }
+
+   // Pilihan pertama: membuat room khusus wasit.
+   if (mode === 'create') {
+     const code = ML.PVP.makeCode();
+     let handle = null;
+
+     // Tampilkan ID room kepada wasit.
+     UI.roomModal(code, function () {
+       if (handle) handle.cancel();
+     });
+
+     // Buat room menggunakan sistem referee yang sudah ada.
+     handle = ML.PVP.createRefereeRoom(
+       B2._fb,
+       code,
+
+       // Dipanggil setelah Player A dan Player B bergabung.
+       function (info) {
+         UI.closeModal();
+         startNetBattle(info);
+       },
+
+       // Jika gagal atau room dibatalkan.
+       function (err) {
+         UI.closeModal();
+
+         const msg = String(err || '');
+
+         if (msg === 'cancel') {
+           UI.toast(' Pembuatan room dibatalkan');
+         } else if (msg === 'timeout') {
+           UI.toast(' Room kadaluarsa karena tidak ada dua pemain');
+         } else if (/permission-denied/i.test(msg)) {
+           UI.toast(' Firebase menolak akses room. Periksa Firestore Rules');
+         } else {
+           UI.toast(' Gagal membuat room: ' + msg.slice(0, 80));
+         }
+       },
+
+       // Perubahan status room.
+       function (status) {
+         if (status === 'waiting') {
+           UI.setModalStatus(
+             ' Menunggu Player A dan Player B bergabung…'
+           );
+         }
+
+         if (status === 'starting') {
+           UI.setModalStatus(
+             ' Kedua pemain sudah siap. Pertandingan dimulai…'
+           );
+         }
+       }
+     );
+   }
+ });
+
+ break;
+}
 
       case 'board-tab':
         UI.boardTab = t.getAttribute('data-tab');
