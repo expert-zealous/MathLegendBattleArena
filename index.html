@@ -4035,10 +4035,83 @@ body {
       if (this.finished) return false;
       const d = U.clamp(Math.round(diff) || 2, 1, 3);
       if (this._freeFlow) {
-        // Klik skill langsung mengganti soal aktif dengan soal baru dari jalur skill tersebut.
-        if (this._ffTimers.p) { clearInterval(this._ffTimers.p); this._ffTimers.p=null; }
-        if (this._ffState.p && !this._ffState.p.answered) this._ffState.p.answered=true;
-        const ok = this._issueFreeFlowQuestion('p', d);
+
+  /* ==========================================
+     ENERGY COST
+
+     Skill 1 = Gratis
+     Skill 2 = -2 Energy
+     Skill 3 = -3 Energy
+  ========================================== */
+
+  let energyCost = 0;
+
+  if (d === 2) {
+
+    energyCost = 2;
+
+  } else if (d === 3) {
+
+    energyCost = 3;
+
+  }
+
+
+  /* ==========================================
+     CEK ENERGY SEBELUM SKILL DIGUNAKAN
+  ========================================== */
+
+  if (
+    energyCost > 0 &&
+    this.p.energy < energyCost
+  ) {
+
+    return false;
+
+  }
+
+
+  /* ==========================================
+     POTONG ENERGY
+  ========================================== */
+
+  if (energyCost > 0) {
+
+    this.p.energy = Math.max(
+      0,
+      this.p.energy - energyCost
+    );
+
+  }
+
+
+  /* Hentikan timer soal sebelumnya */
+
+  if (this._ffTimers.p) {
+
+    clearInterval(this._ffTimers.p);
+
+    this._ffTimers.p = null;
+
+  }
+
+
+  /* Tutup soal sebelumnya */
+
+  if (
+    this._ffState.p &&
+    !this._ffState.p.answered
+  ) {
+
+    this._ffState.p.answered = true;
+
+  }
+
+
+  /* Buat soal baru sesuai Skill */
+
+  const ok =
+    this._issueFreeFlowQuestion('p', d);
         this.emit('difficulty', { difficulty:d, immediate:true, parallel:true });
         return ok;
       }
@@ -4165,17 +4238,23 @@ body {
    Skill 3 / Sulit   = +6 Energy
 ===================================================== */
 
-let energyGain = 2;
+/* ==========================================
+   ENERGY REWARD BERDASARKAN SKILL
 
-/* difficulty soal menentukan reward */
+   Skill 1 / Mudah  = +2
+   Skill 2 / Sedang = +3
+   Skill 3 / Sulit  = +4
+========================================== */
+
+let energyGain = 2;
 
 if (q.difficulty === 2) {
 
-  energyGain = 4;
+  energyGain = 3;
 
 } else if (q.difficulty >= 3) {
 
-  energyGain = 6;
+  energyGain = 4;
 
 }
 
