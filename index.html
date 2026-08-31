@@ -2461,6 +2461,38 @@ body {
   position: relative;
   z-index: 2;
 }
+
+/* Perjelas teks informasi di bawah tombol Skill */
+
+#b-difficulty-skills .diff-skill span {
+  font-size: 9px !important;
+  font-weight: 1000 !important;
+  opacity: 1 !important;
+
+  color: rgba(255,255,255,.95) !important;
+
+  text-shadow:
+    0 1px 2px rgba(0,0,0,.45);
+}
+
+
+/* Khusus Skill 3 Gold */
+
+#b-difficulty-skills .diff-skill.hard span {
+  color: #4a2800 !important;
+
+  text-shadow:
+    0 1px 1px rgba(255,255,255,.35);
+}
+
+
+/* Skill terkunci */
+
+#b-difficulty-skills .diff-skill:disabled span {
+  color: #e2e8f0 !important;
+
+  opacity: .9 !important;
+}
 </style>
 </head>
 <body>
