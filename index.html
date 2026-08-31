@@ -1994,7 +1994,7 @@ body {
       </div>
 
       <div class="home-foot">Math Rating: <b id="h-mr">1000</b><span class="dot">•</span><span id="h-net">v0.8.4 offline</span></div>
-      <button class="link-btn" data-act="watch"> Mode Wasit (buat room / tonton)</button>
+      <button class="link-btn" data-act="watch"> Mode Wasit (buat room.nonton.tidak bermain)</button>
     </div>
   </section>
 
@@ -2018,7 +2018,7 @@ body {
           <button class="btn ghost" data-act="pvp-create">🎮 BUAT RUANGAN (KODE)</button>
           <button class="btn ghost" data-act="pvp-join">🔑 GABUNG KODE</button>
         </div>
-        <p class="page-desc small">Gunakan 2 perangkat berbeda (bukan 2 tab di browser yang sama). Kode ruangan juga bisa ditonton wasit via 📺 Mode Wasit.</p>
+        <p class="page-desc small">Menggunakan ID Room harus ada satu wasit dan 2 player. 📺 Mode Wasit untuk tampilan layar besar (Laptop.LCD).</p>
       </div>
       <button class="btn big primary" data-act="start-battle" id="su-start">⚔️ MULAI BATTLE</button>
     </div>
@@ -10389,10 +10389,10 @@ body {
       if (btnAuto) btnAuto.innerHTML = '⚡ CARI LAWAN ONLINE';
 
       const btnCreate = document.querySelector('[data-act="pvp-create"]');
-      if (btnCreate) btnCreate.innerHTML = '🎮 MAIN DENGAN KODE (HOST)';
+      if (btnCreate) btnCreate.innerHTML = '🔑 MENJADI WASIT (HOST)';
 
       const btnJoin = document.querySelector('[data-act="pvp-join"]');
-      if (btnJoin) btnJoin.innerHTML = '🔑 GABUNG ROOM (GUEST)';
+      if (btnJoin) btnJoin.innerHTML = '🎮 GABUNG ROOM (BERMAIN)';
     };
 
     console.log('[ML] Patch 5.3 Setup UI aktif (gpt-5.6-terra-medium)');
