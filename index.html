@@ -6372,8 +6372,68 @@ friendCode: v.friendCode || '',
     return this._issueQuestion('p',d);
 
   }
-      if(this._difficultyReqSent)return false;
-      this._difficultyReqSent=true;
+
+
+/* ==========================================
+   GUEST / PLAYER B
+
+   Kurangi Energy lokal langsung agar
+   tampilan Player B sama cepat dengan Player A.
+========================================== */
+
+if(this._difficultyReqSent)return false;
+
+
+/* Tentukan sisi pemain lokal */
+
+const localSide=
+  this.role==='playerA'
+    ?'p'
+    :'e';
+
+
+/* Cek Energy sebelum Skill digunakan */
+
+if(
+  energyCost>0 &&
+  this.battle[localSide].energy<energyCost
+){
+
+  return false;
+
+}
+
+
+/* Kurangi Energy lokal langsung */
+
+if(energyCost>0){
+
+  this.battle[localSide].energy=Math.max(
+    0,
+    this.battle[localSide].energy-energyCost
+  );
+
+
+  /* Update UI lokal langsung */
+
+  this.emit('state',{
+    hpP:this.battle.p.hp,
+    hpE:this.battle.e.hp,
+
+    enP:this.battle.p.energy,
+    enE:this.battle.e.energy,
+
+    cbP:this.battle.p.combo,
+    cbE:this.battle.e.combo,
+
+    shP:this.battle.p.shield,
+    shE:this.battle.e.shield
+  });
+
+}
+
+
+this._difficultyReqSent=true;
       const qid='req-'+getUid(this.fb)+'-'+Date.now();
       const requester=this.role==='playerA'?'playerA':'guest';
       this._write({questionReq:{by:requester,difficulty:d,qid:qid}}).catch((err)=>{
