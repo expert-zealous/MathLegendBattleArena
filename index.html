@@ -2280,6 +2280,187 @@ body {
   }
 }
 
+/* =========================================================
+   FINAL UI SKILL 1 / SKILL 2 / SKILL 3 — FULL COLOR
+========================================================= */
+
+#b-difficulty-skills .diff-skill {
+  position: relative;
+  overflow: hidden;
+
+  min-width: 88px;
+  min-height: 52px;
+
+  border: 2px solid rgba(255,255,255,.30);
+  border-radius: 13px;
+
+  padding: 7px 10px;
+
+  color: #fff !important;
+
+  cursor: pointer;
+
+  transition:
+    transform .15s ease,
+    filter .15s ease,
+    box-shadow .15s ease,
+    opacity .15s ease;
+}
+
+
+/* KILAU ATAS */
+
+#b-difficulty-skills .diff-skill::before {
+  content: "";
+
+  position: absolute;
+
+  top: 3px;
+  left: 7%;
+  right: 7%;
+
+  height: 38%;
+
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(255,255,255,.28),
+      rgba(255,255,255,0)
+    );
+
+  pointer-events: none;
+}
+
+
+/* ===============================
+   SKILL 1 — HIJAU
+================================ */
+
+#b-difficulty-skills .diff-skill.easy:not(:disabled) {
+  background:
+    linear-gradient(
+      145deg,
+      #34d399,
+      #16a34a 55%,
+      #15803d
+    ) !important;
+
+  box-shadow:
+    0 4px 0 #0f5132,
+    0 7px 15px rgba(34,197,94,.35);
+}
+
+
+/* ===============================
+   SKILL 2 — UNGU
+================================ */
+
+#b-difficulty-skills .diff-skill.medium:not(:disabled) {
+  background:
+    linear-gradient(
+      145deg,
+      #c084fc,
+      #9333ea 55%,
+      #6d28d9
+    ) !important;
+
+  box-shadow:
+    0 4px 0 #4c1d95,
+    0 7px 15px rgba(168,85,247,.35);
+}
+
+
+/* ===============================
+   SKILL 3 — GOLD
+================================ */
+
+#b-difficulty-skills .diff-skill.hard:not(:disabled) {
+  background:
+    linear-gradient(
+      145deg,
+      #fef08a,
+      #f59e0b 55%,
+      #d97706
+    ) !important;
+
+  color: #3b2100 !important;
+
+  box-shadow:
+    0 4px 0 #92400e,
+    0 7px 15px rgba(245,158,11,.38);
+}
+
+
+/* ===============================
+   SKILL TERKUNCI
+================================ */
+
+#b-difficulty-skills .diff-skill:disabled {
+  background:
+    linear-gradient(
+      145deg,
+      #64748b,
+      #334155
+    ) !important;
+
+  color: #cbd5e1 !important;
+
+  opacity: .55;
+
+  filter: grayscale(.7);
+
+  cursor: not-allowed;
+
+  box-shadow:
+    0 3px 0 #1e293b;
+}
+
+
+/* ===============================
+   SKILL TERPILIH
+================================ */
+
+#b-difficulty-skills .diff-skill.selected:not(:disabled) {
+  outline:
+    2px solid rgba(255,255,255,.95);
+
+  outline-offset: 1px;
+
+  filter: brightness(1.12);
+
+  transform: translateY(-2px);
+}
+
+
+/* HOVER */
+
+#b-difficulty-skills .diff-skill:not(:disabled):hover {
+  transform:
+    translateY(-2px)
+    scale(1.03);
+
+  filter: brightness(1.12);
+}
+
+
+/* CLICK */
+
+#b-difficulty-skills .diff-skill:not(:disabled):active {
+  transform:
+    translateY(1px)
+    scale(.97);
+}
+
+
+/* TEXT */
+
+#b-difficulty-skills .diff-skill b,
+#b-difficulty-skills .diff-skill span {
+  position: relative;
+  z-index: 2;
+}
 </style>
 </head>
 <body>
@@ -2907,7 +3088,7 @@ body {
     Q_TIME: 10,        // fallback (soal tanpa kesulitan)
     MAX_ROUNDS: 20,    // batas ronde; sisa HP menentukan pemenang
     MAX_ENERGY: 10,
-    START_ENERGY: 2,
+    START_ENERGY: 0,
     LEVEL_HP_BONUS: 2, // +2 HP permanen setiap level akun,   // modal awal agar strategi skill terbuka lebih cepat
 
     DIFF_LABEL: ['', 'MUDAH', 'SEDANG', 'SULIT', 'MAHIR', 'LEGENDA'],
@@ -3944,10 +4125,59 @@ body {
         if (grade === 'WEAK') st.weak++;
         att.combo++;
         st.maxCombo = Math.max(st.maxCombo, att.combo);
-        let energyGain = 1 + (grade === 'PERFECT' ? 1 : 0);
-        if (att.hero.id === 'sena' && grade === 'PERFECT') energyGain += 1; // pasif Archer
-        if (att.hero.id === 'morru') att.hp = Math.min(att.maxHp, att.hp + 2); // pasif Necromancer
-        att.energy = Math.min(R.MAX_ENERGY, att.energy + energyGain);
+        /* =====================================================
+   ENERGY REWARD BERDASARKAN SKILL / TINGKAT SOAL
+
+   Skill 1 / Mudah   = +2 Energy
+   Skill 2 / Sedang  = +4 Energy
+   Skill 3 / Sulit   = +6 Energy
+===================================================== */
+
+let energyGain = 2;
+
+/* difficulty soal menentukan reward */
+
+if (q.difficulty === 2) {
+
+  energyGain = 4;
+
+} else if (q.difficulty >= 3) {
+
+  energyGain = 6;
+
+}
+
+
+/* Passive Archer */
+
+if (
+  att.hero.id === 'sena' &&
+  grade === 'PERFECT'
+) {
+
+  energyGain += 1;
+
+}
+
+
+/* Passive Necromancer */
+
+if (att.hero.id === 'morru') {
+
+  att.hp = Math.min(
+    att.maxHp,
+    att.hp + 2
+  );
+
+}
+
+
+/* Tambahkan Energy */
+
+att.energy = Math.min(
+  R.MAX_ENERGY,
+  att.energy + energyGain
+);
         this._attack(att, def, grade, q, source);
       } else {
         st.wrong++;
