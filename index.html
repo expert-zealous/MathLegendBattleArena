@@ -1065,12 +1065,240 @@ body {
 
 /* v0.9 — skill serangan berdasarkan tingkat soal */
 .difficulty-skills { display:flex; gap:6px; align-items:stretch; flex-wrap:wrap; }
-.diff-skill { border:2px solid #e2e8f0; background:#fff; border-radius:12px; padding:7px 9px; min-width:78px; cursor:pointer; font-family:inherit; color:#334155; line-height:1.05; transition:transform .08s,border-color .15s,box-shadow .15s; }
-.diff-skill b { display:block; font-size:10px; }
-.diff-skill span { display:block; font-size:9px; font-weight:900; margin-top:3px; }
-.diff-skill.selected { border-color:#4f46e5; box-shadow:0 0 0 2px rgba(79,70,229,.12); transform:translateY(-1px); }
-.diff-skill:active { transform:scale(.97); }
-.diff-skill:disabled { opacity:.45; cursor:default; }
+/* =====================================
+   DIFFICULTY SKILL BUTTONS
+===================================== */
+
+.diff-skill {
+
+  position: relative;
+
+  border: 2px solid rgba(255,255,255,.25);
+
+  border-radius: 13px;
+
+  padding: 8px 10px;
+
+  min-width: 88px;
+
+  cursor: pointer;
+
+  font-family: inherit;
+
+  line-height: 1.1;
+
+  color: #fff;
+
+  overflow: hidden;
+
+  transition:
+    transform .15s ease,
+    filter .15s ease,
+    opacity .15s ease,
+    box-shadow .15s ease;
+
+}
+
+
+/* Kilau atas */
+
+.diff-skill::before {
+
+  content: "";
+
+  position: absolute;
+
+  left: 8%;
+  right: 8%;
+  top: 3px;
+
+  height: 35%;
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(255,255,255,.25),
+      transparent
+    );
+
+  pointer-events: none;
+}
+
+
+/* =====================================
+   SKILL 1 — GREEN
+===================================== */
+
+.diff-skill.easy {
+
+  background:
+    linear-gradient(
+      145deg,
+      #22c55e,
+      #15803d
+    );
+
+  box-shadow:
+    0 4px 0 #0f5132,
+    0 7px 14px rgba(34,197,94,.28);
+}
+
+
+/* =====================================
+   SKILL 2 — PURPLE
+===================================== */
+
+.diff-skill.medium {
+
+  background:
+    linear-gradient(
+      145deg,
+      #a855f7,
+      #6d28d9
+    );
+
+  box-shadow:
+    0 4px 0 #4c1d95,
+    0 7px 14px rgba(168,85,247,.28);
+}
+
+
+/* =====================================
+   SKILL 3 — GOLD
+===================================== */
+
+.diff-skill.hard {
+
+  background:
+    linear-gradient(
+      145deg,
+      #fde047,
+      #d97706
+    );
+
+  color: #422006;
+
+  box-shadow:
+    0 4px 0 #92400e,
+    0 7px 14px rgba(245,158,11,.30);
+}
+
+
+/* TEXT */
+
+.diff-skill b {
+
+  position: relative;
+  z-index: 2;
+
+  display: block;
+
+  font-size: 11px;
+
+  font-weight: 1000;
+
+}
+
+
+.diff-skill span {
+
+  position: relative;
+  z-index: 2;
+
+  display: block;
+
+  font-size: 8px;
+
+  font-weight: 900;
+
+  margin-top: 4px;
+
+  opacity: .9;
+
+}
+
+
+/* HOVER */
+
+.diff-skill:not(:disabled):hover {
+
+  transform:
+    translateY(-2px)
+    scale(1.03);
+
+  filter: brightness(1.12);
+
+}
+
+
+/* CLICK */
+
+.diff-skill:not(:disabled):active {
+
+  transform:
+    translateY(1px)
+    scale(.97);
+
+}
+
+
+/* =====================================
+   SELECTED
+===================================== */
+
+.diff-skill.selected {
+
+  outline:
+    3px solid rgba(255,255,255,.8);
+
+  outline-offset: 1px;
+
+  filter: brightness(1.15);
+
+}
+
+
+/* =====================================
+   LOCKED
+===================================== */
+
+.diff-skill:disabled {
+
+  cursor: not-allowed;
+
+  background:
+    linear-gradient(
+      145deg,
+      #64748b,
+      #334155
+    );
+
+  color: #cbd5e1;
+
+  box-shadow:
+    0 3px 0 #1e293b;
+
+  opacity: .48;
+
+  filter: grayscale(.75);
+
+}
+
+
+.diff-skill:disabled::after {
+
+  content: "🔒";
+
+  position: absolute;
+
+  right: 6px;
+  bottom: 4px;
+
+  font-size: 12px;
+
+}
 .skillbar { align-items:center; flex-wrap:wrap; }
 .shop-hero-row { display:flex; gap:7px; overflow-x:auto; padding:2px 1px 10px; margin-bottom:2px; }
 .shop-hero { flex:0 0 auto; width:72px; border:2px solid #e2e8f0; background:#fff; border-radius:13px; padding:5px; cursor:pointer; font-family:inherit; }
@@ -2180,10 +2408,43 @@ body {
 
       <div class="skillbar">
         <div class="difficulty-skills" id="b-difficulty-skills">
-          <button class="diff-skill easy" data-act="choose-difficulty" data-diff="1"><b>SKILL 1</b><span>MUDAH</span></button>
-          <button class="diff-skill medium selected" data-act="choose-difficulty" data-diff="2"><b>SKILL 2</b><span>SEDANG</span></button>
-          <button class="diff-skill hard" data-act="choose-difficulty" data-diff="3"><b>SKILL 3</b><span>SULIT</span></button>
-        </div>
+
+  <!-- SKILL 1 selalu aktif -->
+  <button
+    class="diff-skill easy ready selected"
+    data-act="choose-difficulty"
+    data-diff="1">
+
+    <b>⚔️ SKILL 1</b>
+    <span>MUDAH • GRATIS</span>
+
+  </button>
+
+
+  <!-- SKILL 2 membutuhkan 2 Energy -->
+  <button
+    class="diff-skill medium"
+    data-act="choose-difficulty"
+    data-diff="2">
+
+    <b>⚡ SKILL 2</b>
+    <span>SEDANG • ⚡2</span>
+
+  </button>
+
+
+  <!-- SKILL 3 membutuhkan 3 Energy -->
+  <button
+    class="diff-skill hard"
+    data-act="choose-difficulty"
+    data-diff="3">
+
+    <b>🔥 SKILL 3</b>
+    <span>SULIT • ⚡3</span>
+
+  </button>
+
+</div>
         <button class="skill-btn" id="b-skill" data-act="use-skill"></button>
         <span class="skill-hint" id="skill-hint">Pilih skill soal • MUDAH / SEDANG / SULIT</span>
       </div>
@@ -6449,10 +6710,50 @@ friendCode: v.friendCode || '',
       el('b-e-hptext').textContent = Math.max(0, hpE) + '/' + maxE;
     },
     _updEnergy: function (pe, ee) {
-      const P1 = el('b-p-energy').children, E1 = el('b-e-energy').children;
-      for (let i = 0; i < P1.length; i++) P1[i].classList.toggle('on', i < pe);
-      for (let i = 0; i < E1.length; i++) E1[i].classList.toggle('on', i < ee);
-    },
+
+  const P1 =
+    el('b-p-energy').children;
+
+  const E1 =
+    el('b-e-energy').children;
+
+
+  for (
+    let i = 0;
+    i < P1.length;
+    i++
+  ) {
+
+    P1[i].classList.toggle(
+      'on',
+      i < pe
+    );
+
+  }
+
+
+  for (
+    let i = 0;
+    i < E1.length;
+    i++
+  ) {
+
+    E1[i].classList.toggle(
+      'on',
+      i < ee
+    );
+
+  }
+
+
+  // =====================================
+  // UPDATE STATUS SKILL 1 / 2 / 3
+  // SETIAP ENERGY BERUBAH
+  // =====================================
+
+  this._updDifficultySkills();
+
+},
     _updCombo: function (side, combo) {
 
   // Pastikan combo selalu berupa angka valid
@@ -6578,12 +6879,101 @@ friendCode: v.friendCode || '',
     },
 
     _updDifficultySkills: function () {
-      const engine = this.B.engine;
-      const buttons = U.$$('#b-difficulty-skills .diff-skill');
-      if (!buttons.length) return;
-      const locked = !engine || engine.role === 'watch';
-      buttons.forEach(function (b) { b.disabled = !!locked; });
-    },
+
+  const engine = this.B.engine;
+
+  const buttons =
+    U.$$('#b-difficulty-skills .diff-skill');
+
+  if (!buttons.length) return;
+
+
+  // Tidak ada engine atau mode wasit
+  if (!engine || engine.role === 'watch') {
+
+    buttons.forEach(function (b) {
+
+      b.disabled = true;
+
+    });
+
+    return;
+  }
+
+
+  // Energy Player saat ini
+  const energy =
+    Number(engine.p.energy) || 0;
+
+
+  buttons.forEach(function (b) {
+
+    const diff =
+      Number(
+        b.getAttribute('data-diff')
+      );
+
+
+    // =====================================
+    // SKILL 1
+    // SELALU AKTIF
+    // =====================================
+
+    if (diff === 1) {
+
+      b.disabled = false;
+
+      b.classList.add('ready');
+
+      return;
+    }
+
+
+    // =====================================
+    // SKILL 2
+    // BUTUH 2 ENERGY
+    // =====================================
+
+    if (diff === 2) {
+
+      const active =
+        energy >= 2;
+
+      b.disabled =
+        !active;
+
+      b.classList.toggle(
+        'ready',
+        active
+      );
+
+      return;
+    }
+
+
+    // =====================================
+    // SKILL 3
+    // BUTUH 3 ENERGY
+    // =====================================
+
+    if (diff === 3) {
+
+      const active =
+        energy >= 3;
+
+      b.disabled =
+        !active;
+
+      b.classList.toggle(
+        'ready',
+        active
+      );
+
+    }
+
+  });
+
+},
 
     _onQuestion: function (d) {
       const q = d.q;
