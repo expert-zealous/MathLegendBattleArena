@@ -5830,15 +5830,137 @@ friendCode: v.friendCode || '',
         // Player A -> lane p, Player B -> lane e.
         const req=d.questionReq;
         if(req && req.qid){
-          if(req.by==='playerA' && req.qid!==self._lastPlayerAReq){
-            self._lastPlayerAReq=req.qid;
-            self._issueQuestion('p',U.clamp(Number(req.difficulty)||2,1,3));
-            self._write({questionReq:null});
-          }else if(req.by==='guest' && req.qid!==self._lastGuestReq){
-            self._lastGuestReq=req.qid;
-            self._issueQuestion('e',U.clamp(Number(req.difficulty)||2,1,3));
-            self._write({questionReq:null});
-          }
+          if(
+  req.by==='playerA' &&
+  req.qid!==self._lastPlayerAReq
+){
+
+  self._lastPlayerAReq=req.qid;
+
+
+  const difficulty=
+    U.clamp(
+      Number(req.difficulty)||2,
+      1,
+      3
+    );
+
+
+  let energyCost=0;
+
+  if(difficulty===2){
+
+    energyCost=2;
+
+  }else if(difficulty===3){
+
+    energyCost=3;
+
+  }
+
+
+  /* Cek Energy Player A */
+
+  if(
+    energyCost===0 ||
+    battle.p.energy>=energyCost
+  ){
+
+    if(energyCost>0){
+
+      battle.p.energy=Math.max(
+        0,
+        battle.p.energy-energyCost
+      );
+
+      self._scheduleFlush();
+
+    }
+
+
+    self._issueQuestion(
+      'p',
+      difficulty
+    );
+
+  }
+
+
+  self._write({
+    questionReq:null
+  });
+
+
+}else if(
+  req.by==='guest' &&
+  req.qid!==self._lastGuestReq
+){
+
+  self._lastGuestReq=req.qid;
+
+
+  const difficulty=
+    U.clamp(
+      Number(req.difficulty)||2,
+      1,
+      3
+    );
+
+
+  let energyCost=0;
+
+  if(difficulty===2){
+
+    energyCost=2;
+
+  }else if(difficulty===3){
+
+    energyCost=3;
+
+  }
+
+
+  /* =====================================
+     CEK ENERGY PLAYER B / GUEST
+  ====================================== */
+
+  if(
+    energyCost===0 ||
+    battle.e.energy>=energyCost
+  ){
+
+    /* Potong Energy Guest */
+
+    if(energyCost>0){
+
+      battle.e.energy=Math.max(
+        0,
+        battle.e.energy-energyCost
+      );
+
+
+      /* Sinkronkan ke semua perangkat */
+
+      self._scheduleFlush();
+
+    }
+
+
+    /* Buat soal untuk Guest */
+
+    self._issueQuestion(
+      'e',
+      difficulty
+    );
+
+  }
+
+
+  self._write({
+    questionReq:null
+  });
+
+}
         }
 
         // Hero skill remains separate from question skill.
@@ -6185,11 +6307,71 @@ friendCode: v.friendCode || '',
       });
     }
     chooseDifficulty(diff){
-      if(this.role==='watch'||this.finished)return false;
-      const d=U.clamp(Math.round(diff)||2,1,3);
-      // Jangan membuat soal baru sebelum soal aktif selesai: ini mencegah pemain membatalkan soal berulang-ulang.
-      if(this.q && this._qState.p && !this._qState.p.answered)return false;
-      if(this.role==='host') return this._issueQuestion('p',d);
+  if(this.role==='watch'||this.finished)return false;
+
+  const d=U.clamp(Math.round(diff)||2,1,3);
+
+
+  // Jangan membuat soal baru sebelum soal aktif selesai.
+  if(this.q && this._qState.p && !this._qState.p.answered)return false;
+
+
+  /* ==========================================
+     ENERGY COST
+
+     Skill 1 = Gratis
+     Skill 2 = -2 Energy
+     Skill 3 = -3 Energy
+  ========================================== */
+
+  let energyCost=0;
+
+  if(d===2){
+
+    energyCost=2;
+
+  }else if(d===3){
+
+    energyCost=3;
+
+  }
+
+
+  /* ==========================================
+     HOST / PLAYER A
+  ========================================== */
+
+  if(this.role==='host'){
+
+    // Cek Energy Player A
+    if(
+      energyCost>0 &&
+      this.battle.p.energy<energyCost
+    ){
+
+      return false;
+
+    }
+
+
+    // Kurangi Energy
+    if(energyCost>0){
+
+      this.battle.p.energy=Math.max(
+        0,
+        this.battle.p.energy-energyCost
+      );
+
+
+      // Kirim state Energy terbaru ke Firebase
+      this._scheduleFlush();
+
+    }
+
+
+    return this._issueQuestion('p',d);
+
+  }
       if(this._difficultyReqSent)return false;
       this._difficultyReqSent=true;
       const qid='req-'+getUid(this.fb)+'-'+Date.now();
