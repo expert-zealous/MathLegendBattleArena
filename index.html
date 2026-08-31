@@ -6148,17 +6148,84 @@ friendCode: v.friendCode || '',
           self._startGuestTimer(myQ);
         }
         if(d.frame && d.frame.seq && d.frame.seq>self._lastFrameSeq){
-          self._lastFrameSeq=d.frame.seq;
-          if(self.role==='playerA'){
-            self.p.hp=d.frame.hpP; self.p.energy=d.frame.enP; self.p.combo=d.frame.cbP; self.p.shield=d.frame.shP; self.p.empowered=d.frame.empP||null;
-            self.e.hp=d.frame.hpE; self.e.energy=d.frame.enE; self.e.combo=d.frame.cbE; self.e.shield=d.frame.shE; self.e.empowered=d.frame.empE||null;
-            (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,ev.d); });
-          } else {
-            self.e.hp=d.frame.hpP; self.e.energy=d.frame.enP; self.e.combo=d.frame.cbP; self.e.shield=d.frame.shP; self.e.empowered=d.frame.empP||null;
-            self.p.hp=d.frame.hpE; self.p.energy=d.frame.enE; self.p.combo=d.frame.cbE; self.p.shield=d.frame.shE; self.p.empowered=d.frame.empE||null;
-            (d.frame.evts||[]).forEach(function(ev){ self.emit(ev.n,remapSides(ev.d)); });
-          }
-        }
+
+  self._lastFrameSeq=d.frame.seq;
+
+
+  if(self.role==='playerA'){
+
+    self.p.hp=d.frame.hpP;
+    self.p.energy=d.frame.enP;
+    self.p.combo=d.frame.cbP;
+    self.p.shield=d.frame.shP;
+    self.p.empowered=d.frame.empP||null;
+
+    self.e.hp=d.frame.hpE;
+    self.e.energy=d.frame.enE;
+    self.e.combo=d.frame.cbE;
+    self.e.shield=d.frame.shE;
+    self.e.empowered=d.frame.empE||null;
+
+    (d.frame.evts||[]).forEach(function(ev){
+      self.emit(ev.n,ev.d);
+    });
+
+
+  } else {
+
+    /* ==========================================
+       GUEST
+
+       Posisi Energy dibalik karena:
+       Player B melihat dirinya sebagai p,
+       sedangkan state wasit menyimpan Player B
+       sebagai e.
+    ========================================== */
+
+    self.e.hp=d.frame.hpP;
+    self.e.energy=d.frame.enP;
+    self.e.combo=d.frame.cbP;
+    self.e.shield=d.frame.shP;
+    self.e.empowered=d.frame.empP||null;
+
+    self.p.hp=d.frame.hpE;
+    self.p.energy=d.frame.enE;
+    self.p.combo=d.frame.cbE;
+    self.p.shield=d.frame.shE;
+    self.p.empowered=d.frame.empE||null;
+
+    (d.frame.evts||[]).forEach(function(ev){
+      self.emit(ev.n,remapSides(ev.d));
+    });
+
+  }
+
+
+  /* ==========================================
+     UPDATE HUD LANGSUNG SETELAH FRAME DITERIMA
+
+     Ini yang sebelumnya belum ada.
+     Energy, HP, Combo, dan Shield langsung
+     digambar ulang tanpa menunggu jawaban soal.
+  ========================================== */
+
+  self.emit('state',{
+
+    hpP:self.p.hp,
+    hpE:self.e.hp,
+
+    enP:self.p.energy,
+    enE:self.e.energy,
+
+    cbP:self.p.combo,
+    cbE:self.e.combo,
+
+    shP:self.p.shield,
+    shE:self.e.shield
+
+  });
+
+}
         if(d.status==='done'&&d.result&&!self.finished){
           self.finished=true; if(self._timerIv){clearInterval(self._timerIv);self._timerIv=null;}
           const myResult = self.role==='playerA' ? d.result.hostRes : d.result.guestRes;
